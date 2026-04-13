@@ -3,11 +3,20 @@ import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { mockApi } from "@/src/mock/mockApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 type AlertType = "danger" | "warning" | "info";
+type ApiAlertItem = {
+  id: string;
+  title: string;
+  type: string;
+  createdAt: string;
+  read: boolean;
+};
 type AlertItem = {
   id: string;
   type: AlertType;
@@ -19,34 +28,17 @@ type AlertItem = {
 export default function AlertsScreen() {
   const [filter, setFilter] = useState<"all" | AlertType>("all");
 
+  const { data: alertsResponse, isLoading, isError } = useQuery({
+    queryKey: ["alerts", "U1"],
+    queryFn: () => mockApi.getAlerts("U1"),
+  });
+
   const alerts: AlertItem[] = useMemo(
-    () => [
-      {
-        id: "a1",
-        type: "danger",
-        title: "Vật cản nguy hiểm",
-        detail: "0.8m phía trước",
-        time: "09:21",
-      },
-      {
-        id: "a2",
-        type: "warning",
-        title: "Ra khỏi vùng an toàn",
-        detail: "Vượt 30m",
-        time: "08:50",
-      },
-      {
-        id: "a3",
-        type: "info",
-        title: "Thiết bị kết nối lại",
-        detail: "Tín hiệu ổn định",
-        time: "08:10",
-      },
-    ],
-    [],
+    () => (alertsResponse?.items ?? []).map(mapApiAlertToUi),
+    [alertsResponse],
   );
 
-  const data =
+  const filteredAlerts =
     filter === "all" ? alerts : alerts.filter((a) => a.type === filter);
 
   return (
@@ -74,14 +66,23 @@ export default function AlertsScreen() {
         }
       />
 
-      {data.length === 0 ? (
+      {isLoading ? (
+        <EmptyState title="Đang tải cảnh báo..." desc="Vui lòng chờ một chút." />
+      ) : isError ? (
+        <EmptyState
+          title="Không tải được cảnh báo"
+          desc="Có lỗi khi lấy dữ liệu, vui lòng thử lại."
+        />
+      ) : null}
+
+      {!isLoading && !isError && filteredAlerts.length === 0 ? (
         <EmptyState
           title="Không có cảnh báo"
           desc="Hiện không có sự kiện phù hợp bộ lọc."
         />
-      ) : (
+      ) : !isLoading && !isError ? (
         <FlatList
-          data={data}
+          data={filteredAlerts}
           keyExtractor={(it) => it.id}
           contentContainerStyle={{ gap: theme.spacing(1) }}
           renderItem={({ item }) => (
@@ -110,9 +111,25 @@ export default function AlertsScreen() {
             </Card>
           )}
         />
-      )}
+      ) : null}
     </Screen>
   );
+}
+
+function mapApiAlertToUi(alert: ApiAlertItem): AlertItem {
+  return {
+    id: alert.id,
+    title: alert.title,
+    type: mapApiType(alert.type),
+    detail: alert.read ? "Đã đọc" : "Chưa đọc",
+    time: alert.createdAt,
+  };
+}
+
+function mapApiType(type: string): AlertType {
+  if (type === "OBSTACLE") return "danger";
+  if (type === "SAFE_ZONE") return "warning";
+  return "info";
 }
 
 function Chip({

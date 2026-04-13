@@ -17,6 +17,13 @@ export const mockDB = {
         createdAt: "2026-03-04 12:58",
         read: true,
       },
+      {
+        id: "A3",
+        title: "Pin gậy yếu",
+        type: "BATTERY",
+        createdAt: "2026-03-04 11:10",
+        read: false,
+      },
     ],
   },
 
