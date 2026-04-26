@@ -1,100 +1,148 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import Screen from "@/components/Screen";
 import Card from "@/components/Card";
+import EmptyState from "@/components/EmptyState";
+import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import {
+  mapDashboardToUi,
+  mapLatestLocationToUi,
+} from "@/src/api/transformers";
+import { useAppSettings } from "@/src/state/AppSettingsContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 export default function MapScreen() {
-  // mock data (sau này thay bằng GPS/API)
-  const state = useMemo(
-    () => ({
-      location: { lat: 16.0544, lng: 108.2022 },
-      insideSafeZone: true,
-      nearestObstacleM: 1.2,
-      lastUpdate: "1 phút trước",
-    }),
-    [],
-  );
+  const { api, config, isAuthenticated, accessToken } = useAppSettings();
 
-  const zoneColor = state.insideSafeZone
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["map", config.apiUrl, config.blindUserId, accessToken],
+    queryFn: async () => {
+      const [locations, dashboard, devices] = await Promise.all([
+        api.getLocations(config.blindUserId),
+        api.getDashboard(config.blindUserId),
+        api.getDevices(config.blindUserId),
+      ]);
+
+      return {
+        location: mapLatestLocationToUi(locations),
+        dashboard: mapDashboardToUi(dashboard),
+        deviceCount: devices.length,
+      };
+    },
+    enabled: isAuthenticated,
+  });
+
+  const insideSafeZone = data?.dashboard.safeZone === "Trong vung an toan";
+  const zoneColor = insideSafeZone
     ? theme.colors.success
     : theme.colors.danger;
 
   return (
     <Screen>
-      {/* Top summary card */}
-      <Card style={{ marginBottom: theme.spacing(2) }}>
-        <View style={styles.rowBetween}>
-          <View>
-            <Text style={styles.title}>Vị trí người dùng</Text>
-            <Text style={styles.sub}>Cập nhật: {state.lastUpdate}</Text>
-          </View>
-
-          <View style={[styles.pill, { borderColor: `${zoneColor}66` }]}>
-            <View style={[styles.dot, { backgroundColor: zoneColor }]} />
-            <Text style={styles.pillText}>
-              {state.insideSafeZone
-                ? "Trong vùng an toàn"
-                : "Ngoài vùng an toàn"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.metaRow}>
-          <MetaItem
-            icon="latitude"
-            label="Lat"
-            value={String(state.location.lat)}
-          />
-          <MetaItem
-            icon="longitude"
-            label="Lng"
-            value={String(state.location.lng)}
-          />
-        </View>
-      </Card>
-
-      {/* Map placeholder (sau này thay bằng react-native-maps) */}
-      <View style={styles.mapPlaceholder}>
-        <MaterialCommunityIcons
-          name="map-outline"
-          size={38}
-          color={theme.colors.subText}
+      {!isAuthenticated ? (
+        <EmptyState
+          title="Chua dang nhap server"
+          desc="Mo Settings va dang nhap de tai vi tri."
         />
-        <Text style={styles.mapText}>Map preview</Text>
-        <Text style={styles.mapSub}>
-          Tích hợp react-native-maps ở bước tiếp theo
-        </Text>
-      </View>
+      ) : isLoading ? (
+        <EmptyState
+          title="Dang tai vi tri..."
+          desc="Dang lay GPS va thiet bi tu PBL5 server."
+        />
+      ) : isError ? (
+        <EmptyState
+          title="Khong tai duoc ban do"
+          desc={
+            error instanceof Error
+              ? error.message
+              : "Kiem tra server URL va token."
+          }
+        />
+      ) : (
+        <>
+          <Card style={{ marginBottom: theme.spacing(2) }}>
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>Vi tri nguoi dung</Text>
+                <Text style={styles.sub}>
+                  Cap nhat: {data?.location?.updatedAt || "Chua co du lieu"}
+                </Text>
+              </View>
 
-      <SectionTitle title="Thông tin nguy cơ gần nhất" />
+              <View style={[styles.pill, { borderColor: `${zoneColor}66` }]}>
+                <View style={[styles.dot, { backgroundColor: zoneColor }]} />
+                <Text style={styles.pillText}>
+                  {insideSafeZone
+                    ? "Trong vung an toan"
+                    : "Ngoai vung an toan"}
+                </Text>
+              </View>
+            </View>
 
-      <Card>
-        <View style={styles.rowBetween}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View
-              style={[
-                styles.iconWrap,
-                { backgroundColor: `${theme.colors.warning}22` },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="alert-outline"
-                size={20}
-                color={theme.colors.warning}
+            <View style={styles.metaRow}>
+              <MetaItem
+                icon="latitude"
+                label="Lat"
+                value={String(data?.location?.lat ?? "N/A")}
+              />
+              <MetaItem
+                icon="longitude"
+                label="Lng"
+                value={String(data?.location?.lng ?? "N/A")}
               />
             </View>
-            <View>
-              <Text style={styles.itemTitle}>Vật cản gần nhất</Text>
-              <Text style={styles.itemSub}>Khoảng cách ước tính</Text>
-            </View>
+          </Card>
+
+          <View style={styles.mapPlaceholder}>
+            <MaterialCommunityIcons
+              name="map-outline"
+              size={38}
+              color={theme.colors.subText}
+            />
+            <Text style={styles.mapText}>Map preview</Text>
+            <Text style={styles.mapSub}>
+              {data?.location
+                ? `${data.location.lat}, ${data.location.lng}`
+                : "Server chua co diem GPS"}
+            </Text>
           </View>
 
-          <Text style={styles.bigValue}>{state.nearestObstacleM} m</Text>
-        </View>
-      </Card>
+          <SectionTitle title="Thong tin nguy co gan nhat" />
+
+          <Card>
+            <View style={styles.rowBetween}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <View
+                  style={[
+                    styles.iconWrap,
+                    { backgroundColor: `${theme.colors.warning}22` },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="alert-outline"
+                    size={20}
+                    color={theme.colors.warning}
+                  />
+                </View>
+                <View>
+                  <Text style={styles.itemTitle}>Vat can gan nhat</Text>
+                  <Text style={styles.itemSub}>
+                    Thiet bi lien ket: {data?.deviceCount ?? 0}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.bigValue}>
+                {data?.dashboard.nearestDistanceM ?? "N/A"} m
+              </Text>
+            </View>
+          </Card>
+        </>
+      )}
     </Screen>
   );
 }
@@ -128,6 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: theme.spacing(1),
   },
   title: { color: theme.colors.text, fontSize: 16, fontWeight: "800" },
   sub: { color: theme.colors.subText, fontSize: 12, marginTop: 4 },
@@ -187,3 +236,4 @@ const styles = StyleSheet.create({
   itemSub: { color: theme.colors.subText, fontSize: 12, marginTop: 2 },
   bigValue: { color: theme.colors.text, fontSize: 18, fontWeight: "900" },
 });
+

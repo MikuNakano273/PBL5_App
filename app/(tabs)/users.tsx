@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
-import Screen from "@/components/Screen";
 import Card from "@/components/Card";
-import SectionTitle from "@/components/SectionTitle";
 import EmptyState from "@/components/EmptyState";
+import Screen from "@/components/Screen";
+import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { useAppSettings } from "@/src/state/AppSettingsContext";
+import { useQuery } from "@tanstack/react-query";
+import React from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 
 type UserItem = {
   id: string;
@@ -14,22 +16,49 @@ type UserItem = {
 };
 
 export default function UsersScreen() {
-  const users: UserItem[] = useMemo(
-    () => [
-      { id: "u1", name: "Nguyễn Văn A", role: "Người thân", status: "online" },
-      { id: "u2", name: "Trần Thị B", role: "Quản trị", status: "offline" },
-    ],
-    [],
-  );
+  const { api, config, isAuthenticated, accessToken } = useAppSettings();
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["care-links", config.apiUrl, accessToken],
+    queryFn: () => api.getCareLinks(),
+    enabled: isAuthenticated,
+  });
+
+  const users: UserItem[] =
+    data?.map((link) => ({
+      id: link.id ?? link._id ?? `${link.blind_user_id}-${link.family_user_id}`,
+      name: link.family_user_id,
+      role: `${link.relation} -> ${link.blind_user_id}`,
+      status: link.status === "active" ? "online" : "offline",
+    })) ?? [];
 
   return (
     <Screen>
-      <SectionTitle title="Quản lý người dùng" />
+      <SectionTitle title="Quan ly nguoi dung" />
 
-      {users.length === 0 ? (
+      {!isAuthenticated ? (
         <EmptyState
-          title="Chưa có người dùng"
-          desc="Thêm người thân để nhận thông báo và theo dõi."
+          title="Chua dang nhap server"
+          desc="Mo Settings va dang nhap de tai danh sach lien ket."
+        />
+      ) : isLoading ? (
+        <EmptyState
+          title="Dang tai lien ket..."
+          desc="Dang lay care links tu PBL5 server."
+        />
+      ) : isError ? (
+        <EmptyState
+          title="Khong tai duoc lien ket"
+          desc={
+            error instanceof Error
+              ? error.message
+              : "Kiem tra server URL va token."
+          }
+        />
+      ) : users.length === 0 ? (
+        <EmptyState
+          title="Chua co nguoi dung"
+          desc="Server chua tra ve care link nao cho tai khoan nay."
         />
       ) : (
         <FlatList
@@ -79,9 +108,7 @@ function StatusPill({ status }: { status: "online" | "offline" }) {
           borderColor: ok
             ? `${theme.colors.success}66`
             : `${theme.colors.subText}44`,
-          backgroundColor: ok
-            ? `${theme.colors.success}12`
-            : `${theme.colors.card}`,
+          backgroundColor: ok ? `${theme.colors.success}12` : theme.colors.card,
         },
       ]}
     >
@@ -91,7 +118,7 @@ function StatusPill({ status }: { status: "online" | "offline" }) {
           { backgroundColor: ok ? theme.colors.success : theme.colors.subText },
         ]}
       />
-      <Text style={styles.pillText}>{ok ? "ONLINE" : "OFFLINE"}</Text>
+      <Text style={styles.pillText}>{ok ? "ACTIVE" : "INACTIVE"}</Text>
     </View>
   );
 }
@@ -126,3 +153,4 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 99 },
   pillText: { color: theme.colors.text, fontSize: 11, fontWeight: "800" },
 });
+

@@ -1,80 +1,82 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
-import Screen from "@/components/Screen";
 import Card from "@/components/Card";
-import SectionTitle from "@/components/SectionTitle";
 import EmptyState from "@/components/EmptyState";
+import Screen from "@/components/Screen";
+import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { mapDashboardToUi, type UiAlert } from "@/src/api/transformers";
+import { useAppSettings } from "@/src/state/AppSettingsContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
+import React from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-type AlertType = "danger" | "warning" | "info";
-type AlertItem = {
-  id: string;
-  type: AlertType;
-  title: string;
-  detail: string;
-  time: string;
-};
+type AlertType = UiAlert["type"];
+type UiDashboard = NonNullable<ReturnType<typeof mapDashboardToUi>>;
 
 export default function DashboardScreen() {
-  // Mock data (sau này bạn thay bằng API/state)
-  const device = useMemo(
-    () => ({
-      status: "ONLINE" as "ONLINE" | "OFFLINE",
-      lastSync: "2 phút trước",
-      nearestDistanceM: 6.3,
-      alertsToday: 2,
-      safeZone: "Trong vùng an toàn",
-    }),
-    [],
-  );
+  const { api, config, isAuthenticated, accessToken } = useAppSettings();
 
-  const alerts: AlertItem[] = useMemo(
-    () => [
-      {
-        id: "a1",
-        type: "danger",
-        title: "Vật cản nguy hiểm",
-        detail: "0.8m phía trước",
-        time: "09:21",
-      },
-      {
-        id: "a2",
-        type: "warning",
-        title: "Ra khỏi vùng an toàn",
-        detail: "Vượt 30m",
-        time: "08:50",
-      },
-      {
-        id: "a3",
-        type: "info",
-        title: "Thiết bị kết nối lại",
-        detail: "Tín hiệu ổn định",
-        time: "08:10",
-      },
-    ],
-    [],
-  );
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["dashboard", config.apiUrl, config.blindUserId, accessToken],
+    queryFn: () => api.getDashboard(config.blindUserId),
+    enabled: isAuthenticated,
+  });
 
+  const device = data ? mapDashboardToUi(data) : null;
   const statusColor =
-    device.status === "ONLINE" ? theme.colors.success : theme.colors.danger;
+    device?.status === "ONLINE" ? theme.colors.success : theme.colors.danger;
 
   return (
     <Screen>
-      {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.appTitle}>NavicAid</Text>
-          <Text style={styles.subtitle}>Cập nhật: {device.lastSync}</Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {config.apiUrl} | {config.blindUserId}
+          </Text>
         </View>
 
         <View style={[styles.pill, { borderColor: `${statusColor}66` }]}>
           <View style={[styles.dot, { backgroundColor: statusColor }]} />
-          <Text style={styles.pillText}>{device.status}</Text>
+          <Text style={styles.pillText}>{device?.status ?? "OFFLINE"}</Text>
         </View>
       </View>
 
-      {/* Top status card */}
+      {!isAuthenticated ? (
+        <EmptyState
+          title="Chua dang nhap server"
+          desc="Mo Settings, nhap API URL va dang nhap tai khoan mobile de tai du lieu."
+        />
+      ) : isLoading ? (
+        <EmptyState
+          title="Dang tai dashboard..."
+          desc="Dang lay du lieu tu PBL5 server."
+        />
+      ) : isError ? (
+        <EmptyState
+          title="Khong tai duoc dashboard"
+          desc={
+            error instanceof Error
+              ? error.message
+              : "Kiem tra server URL va token."
+          }
+        />
+      ) : device ? (
+        <DashboardContent device={device} alerts={device.recentAlerts} />
+      ) : null}
+    </Screen>
+  );
+}
+
+function DashboardContent({
+  device,
+  alerts,
+}: {
+  device: UiDashboard;
+  alerts: UiAlert[];
+}) {
+  return (
+    <>
       <Card style={{ marginBottom: theme.spacing(2) }}>
         <View style={styles.rowBetween}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -91,13 +93,13 @@ export default function DashboardScreen() {
               />
             </View>
             <View>
-              <Text style={styles.cardTitle}>Trạng thái an toàn</Text>
+              <Text style={styles.cardTitle}>Trang thai an toan</Text>
               <Text style={styles.cardSub}>{device.safeZone}</Text>
             </View>
           </View>
 
           <Pressable style={styles.smallBtn} onPress={() => {}}>
-            <Text style={styles.smallBtnText}>Chi tiết</Text>
+            <Text style={styles.smallBtnText}>Chi tiet</Text>
             <MaterialCommunityIcons
               name="chevron-right"
               size={18}
@@ -107,27 +109,33 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
-      {/* Stats grid */}
       <View style={styles.grid}>
         <StatCard
           icon="map-marker-distance"
-          label="Khoảng cách gần nhất"
-          value={`${device.nearestDistanceM} m`}
+          label="Khoang cach gan nhat"
+          value={
+            device.nearestDistanceM === null
+              ? "N/A"
+              : `${device.nearestDistanceM} m`
+          }
           color={theme.colors.primary}
         />
         <View style={{ width: theme.spacing(1) }} />
         <StatCard
           icon="alert-circle-outline"
-          label="Cảnh báo hôm nay"
+          label="Canh bao hom nay"
           value={`${device.alertsToday}`}
           color={theme.colors.warning}
         />
       </View>
 
-      <SectionTitle title="Cảnh báo gần đây" />
+      <SectionTitle title="Canh bao gan day" />
 
       {alerts.length === 0 ? (
-        <EmptyState title="Không có cảnh báo" desc="Mọi thứ đang an toàn." />
+        <EmptyState
+          title="Khong co canh bao"
+          desc="Chua co su kien moi tu server."
+        />
       ) : (
         <FlatList
           data={alerts}
@@ -161,7 +169,7 @@ export default function DashboardScreen() {
           ListFooterComponent={<View style={{ height: theme.spacing(2) }} />}
         />
       )}
-    </Screen>
+    </>
   );
 }
 
@@ -197,6 +205,7 @@ function pickColor(t: AlertType) {
   if (t === "warning") return theme.colors.warning;
   return theme.colors.primary;
 }
+
 function pickIcon(t: AlertType) {
   if (t === "danger") return "alert-octagon-outline";
   if (t === "warning") return "alert-outline";
@@ -208,6 +217,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: theme.spacing(1),
     marginBottom: theme.spacing(2),
   },
   appTitle: { color: theme.colors.text, fontSize: 22, fontWeight: "900" },
@@ -281,3 +291,4 @@ const styles = StyleSheet.create({
   alertDetail: { color: theme.colors.subText, fontSize: 12, marginTop: 2 },
   alertTime: { color: theme.colors.subText, fontSize: 12 },
 });
+

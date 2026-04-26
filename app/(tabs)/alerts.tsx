@@ -3,38 +3,27 @@ import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
-import { mockApi } from "@/src/mock/mockApi";
+import { mapAlertToUi, type UiAlert } from "@/src/api/transformers";
+import { useAppSettings } from "@/src/state/AppSettingsContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-type AlertType = "danger" | "warning" | "info";
-type ApiAlertItem = {
-  id: string;
-  title: string;
-  type: string;
-  createdAt: string;
-  read: boolean;
-};
-type AlertItem = {
-  id: string;
-  type: AlertType;
-  title: string;
-  detail: string;
-  time: string;
-};
+type AlertType = UiAlert["type"];
 
 export default function AlertsScreen() {
   const [filter, setFilter] = useState<"all" | AlertType>("all");
+  const { api, config, isAuthenticated, accessToken } = useAppSettings();
 
-  const { data: alertsResponse, isLoading, isError } = useQuery({
-    queryKey: ["alerts", "U1"],
-    queryFn: () => mockApi.getAlerts("U1"),
+  const { data: alertsResponse, isLoading, isError, error } = useQuery({
+    queryKey: ["alerts", config.apiUrl, config.blindUserId, accessToken],
+    queryFn: () => api.getAlerts(config.blindUserId),
+    enabled: isAuthenticated,
   });
 
-  const alerts: AlertItem[] = useMemo(
-    () => (alertsResponse?.items ?? []).map(mapApiAlertToUi),
+  const alerts: UiAlert[] = useMemo(
+    () => (alertsResponse ?? []).map(mapAlertToUi),
     [alertsResponse],
   );
 
@@ -44,7 +33,7 @@ export default function AlertsScreen() {
   return (
     <Screen>
       <SectionTitle
-        title="Cảnh báo"
+        title="Canh bao"
         right={
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Chip
@@ -66,21 +55,31 @@ export default function AlertsScreen() {
         }
       />
 
-      {isLoading ? (
-        <EmptyState title="Đang tải cảnh báo..." desc="Vui lòng chờ một chút." />
+      {!isAuthenticated ? (
+        <EmptyState
+          title="Chua dang nhap server"
+          desc="Mo Settings va dang nhap de tai danh sach canh bao."
+        />
+      ) : isLoading ? (
+        <EmptyState
+          title="Dang tai canh bao..."
+          desc="Dang lay du lieu tu PBL5 server."
+        />
       ) : isError ? (
         <EmptyState
-          title="Không tải được cảnh báo"
-          desc="Có lỗi khi lấy dữ liệu, vui lòng thử lại."
+          title="Khong tai duoc canh bao"
+          desc={
+            error instanceof Error
+              ? error.message
+              : "Kiem tra server URL va token."
+          }
         />
-      ) : null}
-
-      {!isLoading && !isError && filteredAlerts.length === 0 ? (
+      ) : filteredAlerts.length === 0 ? (
         <EmptyState
-          title="Không có cảnh báo"
-          desc="Hiện không có sự kiện phù hợp bộ lọc."
+          title="Khong co canh bao"
+          desc="Khong co su kien phu hop bo loc."
         />
-      ) : !isLoading && !isError ? (
+      ) : (
         <FlatList
           data={filteredAlerts}
           keyExtractor={(it) => it.id}
@@ -111,25 +110,9 @@ export default function AlertsScreen() {
             </Card>
           )}
         />
-      ) : null}
+      )}
     </Screen>
   );
-}
-
-function mapApiAlertToUi(alert: ApiAlertItem): AlertItem {
-  return {
-    id: alert.id,
-    title: alert.title,
-    type: mapApiType(alert.type),
-    detail: alert.read ? "Đã đọc" : "Chưa đọc",
-    time: alert.createdAt,
-  };
-}
-
-function mapApiType(type: string): AlertType {
-  if (type === "OBSTACLE") return "danger";
-  if (type === "SAFE_ZONE") return "warning";
-  return "info";
 }
 
 function Chip({
@@ -173,6 +156,7 @@ function pickColor(t: AlertType) {
   if (t === "warning") return theme.colors.warning;
   return theme.colors.primary;
 }
+
 function pickIcon(t: AlertType) {
   if (t === "danger") return "alert-octagon-outline";
   if (t === "warning") return "alert-outline";
@@ -200,3 +184,4 @@ const styles = StyleSheet.create({
   alertDetail: { color: theme.colors.subText, fontSize: 12, marginTop: 2 },
   alertTime: { color: theme.colors.subText, fontSize: 12 },
 });
+
