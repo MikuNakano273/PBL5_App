@@ -3,9 +3,6 @@
 ## Server status
 
 - App API URL is hardcoded to `http://192.168.0.11:8000`.
-- Local health check passed for `http://localhost:8000/api/health`.
-- Demo data has been seeded into the local server MongoDB used by `http://192.168.0.11:8000`.
-- Seed script: `D:\PBL5_Server\scripts\seed_demo_data.py`.
 - Demo DB includes `blind-1`, one device, three GPS rows, three alerts, and one care link.
 
 ## Demo accounts
@@ -16,7 +13,6 @@
 
 ## Start the web app
 
-From `D:\My projects\PBL5_App`:
 
 ```bash
 npm run web
