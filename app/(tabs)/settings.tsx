@@ -3,6 +3,7 @@ import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { router, type Href } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
@@ -72,6 +73,13 @@ export default function SettingsScreen() {
 
       <Card style={{ gap: theme.spacing(1) }}>
         <PressableRow
+          icon="account-circle-outline"
+          title="Thông tin tài khoản"
+          desc="Xem hồ sơ và quyền nhận cảnh báo"
+          onPress={() => router.push("../account")}
+        />
+        <Divider />
+        <PressableRow
           icon="information-outline"
           title="Thông tin ứng dụng"
           desc="Phiên bản, điều khoản"
@@ -82,6 +90,7 @@ export default function SettingsScreen() {
           title="Đăng xuất"
           desc="Thoát tài khoản hiện tại"
           danger
+          onPress={() => router.replace("/login" as Href)}
         />
       </Card>
     </Screen>
@@ -129,15 +138,17 @@ function PressableRow({
   title,
   desc,
   danger,
+  onPress,
 }: {
   icon: any;
   title: string;
   desc?: string;
   danger?: boolean;
+  onPress?: () => void;
 }) {
   const color = danger ? theme.colors.danger : theme.colors.primary;
   return (
-    <Pressable style={styles.row} onPress={() => {}}>
+    <Pressable style={styles.row} onPress={onPress}>
       <View style={[styles.iconWrap, { backgroundColor: `${color}18` }]}>
         <MaterialCommunityIcons name={icon} size={20} color={color} />
       </View>

@@ -1,4 +1,15 @@
 export const mockDB = {
+  auth: {
+    loginAccount: {
+      email: "admin@gmail.com",
+      password: "abcd1234",
+      fullName: "Trần Minh Anh",
+      role: "Người giám hộ",
+      linkedDeviceId: "NC-01",
+      blindUserName: "Nguyễn Minh An",
+    },
+  },
+
   dashboard: {
     device: { id: "D1", online: true, batteryPercent: 78 },
     nearestObstacle: { distanceM: 1.6, level: "danger" },
@@ -59,13 +70,6 @@ export const mockDB = {
         createdAt: "2026-03-04 11:10",
         read: false,
       },
-    ],
-  },
-
-  users: {
-    items: [
-      { id: "U1", name: "Người dùng 1" },
-      { id: "U2", name: "Người dùng 2" },
     ],
   },
 

@@ -3,6 +3,31 @@ import { mockDB } from "./db";
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const mockApi = {
+  async getAuthSeed() {
+    await wait(120);
+    return mockDB.auth;
+  },
+
+  async login(email: string, password: string) {
+    await wait(220);
+    const account = mockDB.auth.loginAccount;
+    const isValid = email === account.email && password === account.password;
+
+    return {
+      ok: isValid,
+      message: isValid ? "Đăng nhập thành công." : "Sai email hoặc mật khẩu.",
+      user: isValid
+        ? {
+            fullName: account.fullName,
+            email: account.email,
+            role: account.role,
+            linkedDeviceId: account.linkedDeviceId,
+            blindUserName: account.blindUserName,
+          }
+        : null,
+    };
+  },
+
   async getDashboard() {
     await wait(300);
     return mockDB.dashboard;
@@ -29,11 +54,6 @@ export const mockApi = {
       a.id === alertId ? { ...a, read: true } : a,
     );
     return { ok: true };
-  },
-
-  async getUsers() {
-    await wait(250);
-    return mockDB.users;
   },
 
   async getSettings(deviceId: string) {

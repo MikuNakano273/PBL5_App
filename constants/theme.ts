@@ -1,44 +1,33 @@
-export const Colors = {
-  light: {
-    text: "#EAF0FF",
-    background: "#0B1220",
-    tint: "#5B8CFF",
+const lightColors = {
+  text: "#14213D",
+  background: "#FFFFFF",
+  tint: "#2F6BFF",
 
-    card: "#121B2E",
-    subText: "#A8B3CF",
-    primary: "#5B8CFF",
-    success: "#23C55E",
-    warning: "#F59E0B",
-    danger: "#EF4444",
-    border: "rgba(255,255,255,0.08)",
-  },
-  dark: {
-    text: "#EAF0FF",
-    background: "#0B1220",
-    tint: "#5B8CFF",
-
-    card: "#121B2E",
-    subText: "#A8B3CF",
-    primary: "#5B8CFF",
-    success: "#23C55E",
-    warning: "#F59E0B",
-    danger: "#EF4444",
-    border: "rgba(255,255,255,0.08)",
-  },
+  card: "#F8FAFC",
+  subText: "#64748B",
+  primary: "#2F6BFF",
+  success: "#16A34A",
+  warning: "#D97706",
+  danger: "#DC2626",
+  border: "#D9E2EC",
 } as const;
 
-// (Tuỳ chọn) nếu bạn vẫn muốn giữ theme cũ kiểu theme.colors.xxx
+export const Colors = {
+  light: lightColors,
+  dark: lightColors,
+} as const;
+
 export const theme = {
-  colors: Colors.dark, // app bạn đang dùng nền tối, để default dark
+  colors: lightColors,
   radius: { md: 14, lg: 18, pill: 999 },
   spacing: (n: number) => n * 8,
   shadow: {
     card: {
-      shadowColor: "#000",
-      shadowOpacity: 0.25,
+      shadowColor: "#0F172A",
+      shadowOpacity: 0.08,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 6,
+      elevation: 4,
     },
   },
 } as const;
