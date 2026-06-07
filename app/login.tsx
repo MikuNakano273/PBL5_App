@@ -94,8 +94,8 @@ export default function LoginScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.demoTitle}>Dữ liệu test nhanh</Text>
                 <Text style={styles.demoText}>
-                  {seed?.loginAccount.email ?? "guardian.demo@gmail.com"} /{" "}
-                  {seed?.loginAccount.password ?? "12345678"}
+                  {seed?.loginAccount.email ?? "user@example.com"} /{" "}
+                  {seed?.loginAccount.password ?? "password123"}
                 </Text>
               </View>
               <Pressable style={styles.demoButton} onPress={handleFillDemo}>
@@ -103,12 +103,12 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
-            <FieldLabel icon="email-outline" label="Gmail" />
+            <FieldLabel icon="email-outline" label="Email" />
             <TextInput
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
-              placeholder="guardian@gmail.com"
+              placeholder="user@example.com"
               placeholderTextColor={theme.colors.subText}
               style={styles.input}
               value={email}

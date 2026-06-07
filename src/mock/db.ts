@@ -1,10 +1,10 @@
 export const mockDB = {
   auth: {
     loginAccount: {
-      email: "admin@gmail.com",
-      password: "abcd1234",
-      fullName: "Trần Minh Anh",
-      role: "Người giám hộ",
+      email: "user@example.com",
+      password: "password123",
+      fullName: "Demo User",
+      role: "user",
       linkedDeviceId: "NC-01",
       blindUserName: "Nguyễn Minh An",
     },
