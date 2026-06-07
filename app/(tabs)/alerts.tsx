@@ -3,6 +3,7 @@ import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { useAuth } from "@/src/auth/AuthContext";
 import { mockApi } from "@/src/mock/mockApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -26,11 +27,13 @@ type AlertItem = {
 };
 
 export default function AlertsScreen() {
+  const { isLoadingAuth, userId } = useAuth();
   const [filter, setFilter] = useState<"all" | AlertType>("all");
 
   const { data: alertsResponse, isLoading, isError } = useQuery({
-    queryKey: ["alerts", "U1"],
-    queryFn: () => mockApi.getAlerts("U1"),
+    queryKey: ["alerts", userId],
+    queryFn: () => mockApi.getAlerts(userId as string),
+    enabled: Boolean(userId),
   });
 
   const alerts: AlertItem[] = useMemo(
@@ -66,7 +69,17 @@ export default function AlertsScreen() {
         }
       />
 
-      {isLoading ? (
+      {isLoadingAuth ? (
+        <EmptyState
+          title="Đang kiểm tra phiên đăng nhập..."
+          desc="Vui lòng chờ một chút."
+        />
+      ) : !userId ? (
+        <EmptyState
+          title="Chưa có phiên đăng nhập"
+          desc="Vui lòng đăng nhập để xem cảnh báo."
+        />
+      ) : isLoading ? (
         <EmptyState title="Đang tải cảnh báo..." desc="Vui lòng chờ một chút." />
       ) : isError ? (
         <EmptyState
@@ -75,12 +88,12 @@ export default function AlertsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && filteredAlerts.length === 0 ? (
+      {!isLoadingAuth && userId && !isLoading && !isError && filteredAlerts.length === 0 ? (
         <EmptyState
           title="Không có cảnh báo"
           desc="Hiện không có sự kiện phù hợp bộ lọc."
         />
-      ) : !isLoading && !isError ? (
+      ) : !isLoadingAuth && userId && !isLoading && !isError ? (
         <FlatList
           data={filteredAlerts}
           keyExtractor={(it) => it.id}

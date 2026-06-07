@@ -1,10 +1,10 @@
 import { theme } from "@/constants/theme";
-import { AuthProvider } from "@/src/auth/AuthContext";
+import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { router, Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
 export default function RootLayout() {
@@ -13,6 +13,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <AuthNavigationGuard />
         <StatusBar style="dark" backgroundColor="#ffffff" />
         <Stack>
           <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -30,6 +31,30 @@ export default function RootLayout() {
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+function AuthNavigationGuard() {
+  const pathname = usePathname();
+  const { isAuthenticated, isLoadingAuth } = useAuth();
+
+  useEffect(() => {
+    if (isLoadingAuth) {
+      return;
+    }
+
+    const isAuthRoute = pathname === "/" || pathname === "/login";
+
+    if (isAuthenticated && isAuthRoute) {
+      router.replace("/(tabs)/dashboard");
+      return;
+    }
+
+    if (!isAuthenticated && !isAuthRoute) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoadingAuth, pathname]);
+
+  return null;
 }
 
 function AccountBackButton() {

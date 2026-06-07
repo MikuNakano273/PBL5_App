@@ -36,17 +36,17 @@ const getLoginErrorMessage = (error: unknown) => {
 };
 
 export default function LoginScreen() {
-  const { isHydrating, login, user } = useAuth();
+  const { isAuthenticated, isLoadingAuth, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isHydrating && user) {
+    if (!isLoadingAuth && isAuthenticated) {
       router.replace("/(tabs)/dashboard" as Href);
     }
-  }, [isHydrating, user]);
+  }, [isAuthenticated, isLoadingAuth]);
 
   const handleFillDemo = () => {
     setEmail(DEMO_EMAIL);

@@ -10,6 +10,7 @@ import {
 
 import {
   getMobileMe,
+  getUserId,
   loginMobile,
   logoutMobile,
   type MobileLoginInput,
@@ -19,9 +20,13 @@ import { clearTokens, getAccessToken } from "@/src/auth/tokenStorage";
 
 type AuthContextValue = {
   user: MobileUser | null;
+  userId: string | null;
+  isAuthenticated: boolean;
+  isLoadingAuth: boolean;
   isHydrating: boolean;
   login: (input: MobileLoginInput) => Promise<MobileUser>;
   logout: () => Promise<void>;
+  refreshMe: () => Promise<MobileUser | null>;
   setUser: (user: MobileUser | null) => void;
 };
 
@@ -30,6 +35,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MobileUser | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const currentUser = await getMobileMe();
+      setUser(currentUser);
+
+      return currentUser;
+    } catch (error) {
+      await clearTokens();
+      setUser(null);
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,19 +93,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await logoutMobile();
-    setUser(null);
+    try {
+      await logoutMobile();
+    } finally {
+      setUser(null);
+    }
   }, []);
+
+  const userId = user ? (getUserId(user) ?? null) : null;
+  const isAuthenticated = Boolean(user && userId);
 
   const value = useMemo(
     () => ({
       user,
+      userId,
+      isAuthenticated,
+      isLoadingAuth: isHydrating,
       isHydrating,
       login,
       logout,
+      refreshMe,
       setUser,
     }),
-    [isHydrating, login, logout, user],
+    [isAuthenticated, isHydrating, login, logout, refreshMe, user, userId],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
