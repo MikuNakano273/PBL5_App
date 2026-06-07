@@ -1,4 +1,5 @@
 import { theme } from "@/constants/theme";
+import { AuthProvider } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
@@ -11,20 +12,22 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="dark" backgroundColor="#ffffff" />
-      <Stack>
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="account"
-          options={{
-            title: "Thông tin tài khoản",
-            headerBackVisible: false,
-            headerLeft: () => <AccountBackButton />,
-          }}
-        />
-        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-      </Stack>
+      <AuthProvider>
+        <StatusBar style="dark" backgroundColor="#ffffff" />
+        <Stack>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="account"
+            options={{
+              title: "Thông tin tài khoản",
+              headerBackVisible: false,
+              headerLeft: () => <AccountBackButton />,
+            }}
+          />
+          <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+        </Stack>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

@@ -1,7 +1,8 @@
 import Card from "@/components/Card";
 import Screen from "@/components/Screen";
 import { theme } from "@/constants/theme";
-import { mockApi } from "@/src/mock/mockApi";
+import { useAuth } from "@/src/auth/AuthContext";
+import { type NormalizedApiError } from "@/src/api/http";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -17,23 +18,39 @@ import {
   View,
 } from "react-native";
 
-type AuthSeed = Awaited<ReturnType<typeof mockApi.getAuthSeed>>;
+const DEMO_EMAIL = "user@example.com";
+const DEMO_PASSWORD = "password123";
+
+const getLoginErrorMessage = (error: unknown) => {
+  const apiError = error as Partial<NormalizedApiError>;
+
+  if (apiError.status === 401 || apiError.code === "invalid_credentials") {
+    return apiError.message || "Email hoặc mật khẩu không đúng.";
+  }
+
+  if (apiError.status === 422 || apiError.code === "validation_error") {
+    return apiError.message || "Thông tin đăng nhập chưa hợp lệ.";
+  }
+
+  return apiError.message || "Không thể đăng nhập. Vui lòng thử lại.";
+};
 
 export default function LoginScreen() {
-  const [seed, setSeed] = useState<AuthSeed | null>(null);
+  const { isHydrating, login, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    mockApi.getAuthSeed().then(setSeed);
-  }, []);
+    if (!isHydrating && user) {
+      router.replace("/(tabs)/dashboard" as Href);
+    }
+  }, [isHydrating, user]);
 
   const handleFillDemo = () => {
-    if (!seed) return;
-    setEmail(seed.loginAccount.email);
-    setPassword(seed.loginAccount.password);
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
   };
 
   const handleLogin = async () => {
@@ -42,25 +59,18 @@ export default function LoginScreen() {
       return;
     }
 
-    setSubmitting(true);
-    const result = await mockApi.login(email.trim().toLowerCase(), password);
-    setSubmitting(false);
-
-    if (!result.ok) {
-      Alert.alert("Đăng nhập thất bại", result.message);
-      return;
+    try {
+      setSubmitting(true);
+      await login({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      router.replace("/(tabs)/dashboard" as Href);
+    } catch (error) {
+      Alert.alert("Đăng nhập thất bại", getLoginErrorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
-
-    Alert.alert(
-      "Đăng nhập thành công",
-      `Xin chào ${result.user?.fullName ?? ""}.`,
-      [
-        {
-          text: "Tiếp tục",
-          onPress: () => router.replace("/(tabs)/dashboard" as Href),
-        },
-      ],
-    );
   };
 
   return (
@@ -84,8 +94,8 @@ export default function LoginScreen() {
             <Text style={styles.eyebrow}>NAVICAID ACCESS</Text>
             <Text style={styles.title}>Đăng nhập tài khoản</Text>
             <Text style={styles.subtitle}>
-              Đăng nhập bằng tài khoản được cấp sẵn theo gậy để theo dõi hoạt
-              động và cảnh báo của người khiếm thị.
+              Đăng nhập bằng tài khoản người dùng NavicAid để theo dõi thiết bị,
+              vị trí và cảnh báo an toàn.
             </Text>
           </View>
 
@@ -94,8 +104,7 @@ export default function LoginScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.demoTitle}>Dữ liệu test nhanh</Text>
                 <Text style={styles.demoText}>
-                  {seed?.loginAccount.email ?? "user@example.com"} /{" "}
-                  {seed?.loginAccount.password ?? "password123"}
+                  {DEMO_EMAIL} / {DEMO_PASSWORD}
                 </Text>
               </View>
               <Pressable style={styles.demoButton} onPress={handleFillDemo}>
@@ -153,8 +162,8 @@ export default function LoginScreen() {
                 color={theme.colors.primary}
               />
               <Text style={styles.deviceNoticeText}>
-                Mỗi gậy NavicAid chỉ liên kết với một tài khoản giám hộ do hệ
-                thống cấp sẵn.
+                Tài khoản người dùng NavicAid được liên kết với thiết bị để đồng
+                bộ cảnh báo và trạng thái an toàn.
               </Text>
             </View>
           </Card>

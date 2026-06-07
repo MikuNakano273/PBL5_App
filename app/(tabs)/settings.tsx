@@ -2,15 +2,22 @@ import Card from "@/components/Card";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 export default function SettingsScreen() {
+  const { logout } = useAuth();
   const [enableAlerts, setEnableAlerts] = useState(true);
   const [enableRealtime, setEnableRealtime] = useState(true);
   const [vibration, setVibration] = useState(true);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login" as Href);
+  };
 
   return (
     <Screen>
@@ -90,7 +97,7 @@ export default function SettingsScreen() {
           title="Đăng xuất"
           desc="Thoát tài khoản hiện tại"
           danger
-          onPress={() => router.replace("/login" as Href)}
+          onPress={handleLogout}
         />
       </Card>
     </Screen>
