@@ -3,24 +3,22 @@ import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import {
+  getMobileUserAlerts,
+  type MobileAlert,
+} from "@/src/api/alertService";
 import { useAuth } from "@/src/auth/AuthContext";
-import { mockApi } from "@/src/mock/mockApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 type AlertType = "danger" | "warning" | "info";
-type ApiAlertItem = {
-  id: string;
-  title: string;
-  type: string;
-  createdAt: string;
-  read: boolean;
-};
+type AlertFilter = "all" | AlertType | "open" | "resolved";
 type AlertItem = {
   id: string;
   type: AlertType;
+  status: string;
   title: string;
   detail: string;
   time: string;
@@ -28,21 +26,25 @@ type AlertItem = {
 
 export default function AlertsScreen() {
   const { isLoadingAuth, userId } = useAuth();
-  const [filter, setFilter] = useState<"all" | AlertType>("all");
+  const [filter, setFilter] = useState<AlertFilter>("all");
 
-  const { data: alertsResponse, isLoading, isError } = useQuery({
-    queryKey: ["alerts", userId],
-    queryFn: () => mockApi.getAlerts(userId as string),
+  const { data: alerts = [], isLoading, isError } = useQuery({
+    queryKey: ["mobile-alerts", userId, 1, 20],
+    queryFn: () => getMobileUserAlerts(userId as string, { page: 1, limit: 20 }),
     enabled: Boolean(userId),
   });
 
-  const alerts: AlertItem[] = useMemo(
-    () => (alertsResponse?.items ?? []).map(mapApiAlertToUi),
-    [alertsResponse],
+  const alertItems: AlertItem[] = useMemo(
+    () => alerts.map(mapApiAlertToUi),
+    [alerts],
   );
 
   const filteredAlerts =
-    filter === "all" ? alerts : alerts.filter((a) => a.type === filter);
+    filter === "all"
+      ? alertItems
+      : alertItems.filter(
+          (alert) => alert.type === filter || normalizeStatus(alert.status) === filter,
+        );
 
   return (
     <Screen>
@@ -64,6 +66,16 @@ export default function AlertsScreen() {
               text="Warn"
               active={filter === "warning"}
               onPress={() => setFilter("warning")}
+            />
+            <Chip
+              text="Open"
+              active={filter === "open"}
+              onPress={() => setFilter("open")}
+            />
+            <Chip
+              text="Resolved"
+              active={filter === "resolved"}
+              onPress={() => setFilter("resolved")}
             />
           </View>
         }
@@ -129,20 +141,80 @@ export default function AlertsScreen() {
   );
 }
 
-function mapApiAlertToUi(alert: ApiAlertItem): AlertItem {
+function mapApiAlertToUi(alert: MobileAlert, index: number): AlertItem {
   return {
-    id: alert.id,
-    title: alert.title,
-    type: mapApiType(alert.type),
-    detail: alert.read ? "Đã đọc" : "Chưa đọc",
-    time: alert.createdAt,
+    id: alert.id ?? `${alert.triggered_at}-${index}`,
+    title: alert.message || "Không có nội dung cảnh báo.",
+    type: mapRiskLevel(alert.risk_level),
+    status: alert.status,
+    detail: formatAlertDetail(alert),
+    time: formatDateTime(alert.triggered_at),
   };
 }
 
-function mapApiType(type: string): AlertType {
-  if (type === "OBSTACLE") return "danger";
-  if (type === "SAFE_ZONE") return "warning";
+function formatAlertDetail(alert: MobileAlert) {
+  const parts = [
+    formatAlertType(alert.alert_type),
+    formatStatus(alert.status),
+    alert.distance_cm == null ? null : `Khoảng cách ${alert.distance_cm} cm`,
+  ];
+
+  return parts.filter(Boolean).join(" - ");
+}
+
+function formatAlertType(alertType: string) {
+  return alertType
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0)}${part.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function formatStatus(status: string) {
+  const normalizedStatus = normalizeStatus(status);
+
+  if (normalizedStatus === "open") {
+    return "Đang mở";
+  }
+
+  if (normalizedStatus === "resolved") {
+    return "Đã xử lý";
+  }
+
+  return status;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function mapRiskLevel(riskLevel: string): AlertType {
+  const normalizedRiskLevel = riskLevel.toLowerCase();
+
+  if (normalizedRiskLevel === "high" || normalizedRiskLevel === "danger") {
+    return "danger";
+  }
+
+  if (normalizedRiskLevel === "warning" || normalizedRiskLevel === "caution") {
+    return "warning";
+  }
+
   return "info";
+}
+
+function normalizeStatus(status: string) {
+  return status.toLowerCase();
 }
 
 function Chip({
