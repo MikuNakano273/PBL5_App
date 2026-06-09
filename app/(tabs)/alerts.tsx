@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -111,29 +112,46 @@ export default function AlertsScreen() {
           keyExtractor={(it) => it.id}
           contentContainerStyle={{ gap: theme.spacing(1) }}
           renderItem={({ item }) => (
-            <Card>
-              <View style={styles.alertRow}>
-                <View
-                  style={[
-                    styles.alertIcon,
-                    { backgroundColor: `${pickColor(item.type)}22` },
-                  ]}
-                >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Xem chi tiết ${item.title}`}
+              onPress={() =>
+                router.push({
+                  pathname: "/alerts/[id]",
+                  params: { id: item.id },
+                })
+              }
+              style={({ pressed }) => pressed && styles.cardPressed}
+            >
+              <Card>
+                <View style={styles.alertRow}>
+                  <View
+                    style={[
+                      styles.alertIcon,
+                      { backgroundColor: `${pickColor(item.type)}22` },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={pickIcon(item.type)}
+                      size={20}
+                      color={pickColor(item.type)}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.alertTitle}>{item.title}</Text>
+                    <Text style={styles.alertDetail}>{item.detail}</Text>
+                  </View>
+
+                  <Text style={styles.alertTime}>{item.time}</Text>
                   <MaterialCommunityIcons
-                    name={pickIcon(item.type)}
+                    name="chevron-right"
                     size={20}
-                    color={pickColor(item.type)}
+                    color={theme.colors.subText}
                   />
                 </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.alertTitle}>{item.title}</Text>
-                  <Text style={styles.alertDetail}>{item.detail}</Text>
-                </View>
-
-                <Text style={styles.alertTime}>{item.time}</Text>
-              </View>
-            </Card>
+              </Card>
+            </Pressable>
           )}
         />
       ) : null}
@@ -266,6 +284,7 @@ function pickIcon(t: AlertType) {
 }
 
 const styles = StyleSheet.create({
+  cardPressed: { opacity: 0.72 },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,

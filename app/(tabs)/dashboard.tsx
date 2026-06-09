@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -127,14 +128,6 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          <Pressable style={styles.smallBtn} onPress={() => {}}>
-            <Text style={styles.smallBtnText}>Chi tiết</Text>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={18}
-              color={theme.colors.subText}
-            />
-          </Pressable>
         </View>
       </Card>
 
@@ -183,6 +176,24 @@ export default function DashboardScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.alertTitle}>{item.title}</Text>
                   <Text style={styles.alertDetail}>{item.detail}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Xem chi tiết ${item.title}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/alerts/[id]",
+                        params: { id: item.id },
+                      })
+                    }
+                    style={styles.smallBtn}
+                  >
+                    <Text style={styles.smallBtnText}>Chi tiết</Text>
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={18}
+                      color={theme.colors.subText}
+                    />
+                  </Pressable>
                 </View>
 
                 <Text style={styles.alertTime}>{item.time}</Text>
@@ -394,9 +405,11 @@ const styles = StyleSheet.create({
   cardSub: { color: theme.colors.subText, fontSize: 12, marginTop: 2 },
 
   smallBtn: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    marginTop: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: theme.radius.pill,

@@ -23,7 +23,31 @@ export default function RootLayout() {
             options={{
               title: "Thông tin tài khoản",
               headerBackVisible: false,
-              headerLeft: () => <AccountBackButton />,
+              headerLeft: () => <BackButton />,
+            }}
+          />
+          <Stack.Screen
+            name="account/edit"
+            options={{
+              title: "Chỉnh sửa hồ sơ",
+              headerBackVisible: false,
+              headerLeft: () => <BackButton />,
+            }}
+          />
+          <Stack.Screen
+            name="account/change-password"
+            options={{
+              title: "Đổi mật khẩu",
+              headerBackVisible: false,
+              headerLeft: () => <BackButton />,
+            }}
+          />
+          <Stack.Screen
+            name="alerts/[id]"
+            options={{
+              title: "Chi tiết cảnh báo",
+              headerBackVisible: false,
+              headerLeft: () => <BackButton />,
             }}
           />
           <Stack.Screen name="modal" options={{ presentation: "modal" }} />
@@ -57,7 +81,7 @@ function AuthNavigationGuard() {
   return null;
 }
 
-function AccountBackButton() {
+function BackButton() {
   return (
     <Pressable
       accessibilityRole="button"

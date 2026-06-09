@@ -31,6 +31,20 @@ export type MobileLoginInput = {
   platform?: string;
 };
 
+export type UpdateMobileMeInput = {
+  full_name: string;
+  phone: string;
+};
+
+export type ChangeMobilePasswordInput = {
+  current_password: string;
+  new_password: string;
+};
+
+type ChangeMobilePasswordResponse = {
+  status: string;
+};
+
 export type TokenResponse = {
   access_token: string;
   refresh_token: string;
@@ -158,4 +172,21 @@ export async function getMobileMe(): Promise<MobileUser> {
   const response = await http.get<MobileUser>("/api/mobile/v1/me");
 
   return response.data;
+}
+
+export async function updateMobileMe(
+  input: UpdateMobileMeInput,
+): Promise<MobileUser> {
+  const response = await http.patch<MobileUser>("/api/mobile/v1/me", input);
+
+  return response.data;
+}
+
+export async function changeMobilePassword(
+  input: ChangeMobilePasswordInput,
+): Promise<void> {
+  await http.post<ChangeMobilePasswordResponse>(
+    "/api/mobile/v1/me/change-password",
+    input,
+  );
 }

@@ -11,8 +11,9 @@ import {
 import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function AccountScreen() {
   const { isLoadingAuth, user: authenticatedUser, userId } = useAuth();
@@ -78,7 +79,27 @@ export default function AccountScreen() {
       >
         <AccountHero user={user} />
 
-        <SectionTitle title="Thông tin tài khoản" />
+        <SectionTitle
+          title="Thông tin tài khoản"
+          right={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Chỉnh sửa hồ sơ"
+              onPress={() => router.push("/account/edit")}
+              style={({ pressed }) => [
+                styles.editButton,
+                pressed && styles.editButtonPressed,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="pencil-outline"
+                size={16}
+                color={theme.colors.primary}
+              />
+              <Text style={styles.editButtonText}>Chỉnh sửa</Text>
+            </Pressable>
+          }
+        />
         <Card style={styles.sectionCard}>
           <InfoRow
             icon="email-outline"
@@ -105,6 +126,35 @@ export default function AccountScreen() {
             valueColor={getStatusColor(user.status)}
           />
         </Card>
+
+        <SectionTitle title="Bảo mật" />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Đổi mật khẩu"
+          onPress={() => router.push("/account/change-password")}
+          style={({ pressed }) => pressed && styles.securityCardPressed}
+        >
+          <Card style={styles.securityCard}>
+            <View style={styles.securityIcon}>
+              <MaterialCommunityIcons
+                name="lock-reset"
+                size={20}
+                color={theme.colors.primary}
+              />
+            </View>
+            <View style={styles.securityContent}>
+              <Text style={styles.securityTitle}>Đổi mật khẩu</Text>
+              <Text style={styles.securityDesc}>
+                Cập nhật mật khẩu và đăng nhập lại trên thiết bị
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={22}
+              color={theme.colors.subText}
+            />
+          </Card>
+        </Pressable>
 
         <SectionTitle title="Thiết bị liên kết" />
         {isLoadingDevices ? (
@@ -300,6 +350,54 @@ function getStatusColor(status?: string | null) {
 }
 
 const styles = StyleSheet.create({
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: `${theme.colors.primary}40`,
+    backgroundColor: `${theme.colors.primary}10`,
+  },
+  editButtonPressed: {
+    opacity: 0.7,
+  },
+  editButtonText: {
+    color: theme.colors.primary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  securityCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  securityCardPressed: {
+    opacity: 0.72,
+  },
+  securityIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${theme.colors.primary}14`,
+  },
+  securityContent: {
+    flex: 1,
+  },
+  securityTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  securityDesc: {
+    color: theme.colors.subText,
+    fontSize: 11,
+    marginTop: 3,
+  },
   content: {
     paddingBottom: theme.spacing(3),
   },

@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
@@ -84,11 +85,16 @@ export default function NotificationsScreen() {
   );
 
   const handleNotificationPress = (notification: MobileNotification) => {
-    if (notification.read_at || markReadMutation.isPending) {
-      return;
+    if (!notification.read_at && !markReadMutation.isPending) {
+      markReadMutation.mutate(notification.id);
     }
 
-    markReadMutation.mutate(notification.id);
+    if (notification.event.alert_id) {
+      router.push({
+        pathname: "/alerts/[id]",
+        params: { id: notification.event.alert_id },
+      });
+    }
   };
 
   if (isLoadingAuth || (userId && isLoading)) {
@@ -245,6 +251,7 @@ function NotificationCard({
   onPress: () => void;
 }) {
   const isUnread = !notification.read_at;
+  const hasAlertDetail = Boolean(notification.event.alert_id);
   const tone = mapRiskLevel(notification.event.risk_level);
   const color = pickToneColor(tone);
 
@@ -254,7 +261,7 @@ function NotificationCard({
       accessibilityLabel={`${notification.event.title}. ${
         isUnread ? "Chưa đọc" : "Đã đọc"
       }`}
-      disabled={!isUnread || isMarkingRead}
+      disabled={!hasAlertDetail && (!isUnread || isMarkingRead)}
       onPress={onPress}
       style={({ pressed }) => pressed && styles.cardPressed}
     >
@@ -307,7 +314,13 @@ function NotificationCard({
                 {formatDateTime(notification.created_at)}
               </Text>
               <Text style={[styles.readState, isUnread && { color }]}>
-                {isMarkingRead ? "Đang cập nhật..." : isUnread ? "Chạm để đánh dấu đã đọc" : "Đã đọc"}
+                {isMarkingRead
+                  ? "Đang cập nhật..."
+                  : hasAlertDetail
+                    ? "Chạm để xem chi tiết"
+                    : isUnread
+                      ? "Chạm để đánh dấu đã đọc"
+                      : "Đã đọc"}
               </Text>
             </View>
           </View>
