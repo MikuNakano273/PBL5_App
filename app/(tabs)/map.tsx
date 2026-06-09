@@ -1,34 +1,99 @@
 import Card from "@/components/Card";
+import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import {
+  getMobileDashboard,
+  type DashboardLocation,
+  type MobileDashboard,
+} from "@/src/api/dashboardService";
+import {
+  getMobileUserLocations,
+  type MobileLocation,
+} from "@/src/api/locationService";
+import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import React, { useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Circle, Marker } from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 
-const DEFAULT_REGION = {
-  latitude: 16.0544,
-  longitude: 108.2022,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
+type MapCoordinate = {
+  latitude: number;
+  longitude: number;
 };
 
+const MAP_REFETCH_INTERVAL_MS = 10000;
+
 export default function MapScreen() {
+  const { isLoadingAuth, userId } = useAuth();
+
+  const {
+    data: locations = [],
+    isError: isLocationsError,
+    isLoading: isLoadingLocations,
+  } = useQuery({
+    queryKey: ["mobile-locations", userId, 1],
+    queryFn: () => getMobileUserLocations(userId as string, { limit: 1 }),
+    enabled: Boolean(userId),
+    refetchInterval: MAP_REFETCH_INTERVAL_MS,
+  });
+
+  const {
+    data: dashboard,
+    isError: isDashboardError,
+    isLoading: isLoadingDashboard,
+  } = useQuery({
+    queryKey: ["mobile-dashboard", userId],
+    queryFn: () => getMobileDashboard(userId as string),
+    enabled: Boolean(userId),
+    refetchInterval: MAP_REFETCH_INTERVAL_MS,
+  });
+
   const state = useMemo(
-    () => ({
-      location: { lat: 16.0544, lng: 108.2022 },
-      safeZoneRadiusM: 120,
-      insideSafeZone: true,
-      nearestObstacleM: 1.2,
-      lastUpdate: "1 phút trước",
-    }),
-    [],
+    () => mapScreenState(locations, dashboard),
+    [dashboard, locations],
   );
 
-  const zoneColor = state.insideSafeZone
-    ? theme.colors.success
-    : theme.colors.danger;
+  const statusColor = pickStatusColor(dashboard);
+  const isLoadingData = isLoadingLocations || isLoadingDashboard;
+  const hasRecoverableLocationFallback =
+    isLocationsError && Boolean(extractDashboardCoordinate(dashboard?.last_location));
+  const isError = (isLocationsError && !hasRecoverableLocationFallback) || isDashboardError;
+
+  if (isLoadingAuth || (userId && isLoadingData)) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Đang tải vị trí..."
+          desc="Vui lòng chờ trong giây lát."
+        />
+      </Screen>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Chưa có phiên đăng nhập"
+          desc="Vui lòng đăng nhập để xem vị trí."
+        />
+      </Screen>
+    );
+  }
+
+  if (isError && !state.coordinate) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Không tải được vị trí"
+          desc="Có lỗi khi lấy dữ liệu từ server, vui lòng thử lại."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -39,31 +104,34 @@ export default function MapScreen() {
             <Text style={styles.sub}>Cập nhật: {state.lastUpdate}</Text>
           </View>
 
-          <View style={[styles.pill, { borderColor: `${zoneColor}55` }]}>
-            <View style={[styles.dot, { backgroundColor: zoneColor }]} />
-            <Text style={styles.pillText}>
-              {state.insideSafeZone
-                ? "Trong vùng an toàn"
-                : "Ngoài vùng an toàn"}
-            </Text>
+          <View style={[styles.pill, { borderColor: `${statusColor}55` }]}>
+            <View style={[styles.dot, { backgroundColor: statusColor }]} />
+            <Text style={styles.pillText}>{state.safetyText}</Text>
           </View>
         </View>
 
-        <View style={styles.metaRow}>
-          <MetaItem
-            icon="latitude"
-            label="Lat"
-            value={state.location.lat.toFixed(4)}
-          />
-          <MetaItem
-            icon="longitude"
-            label="Lng"
-            value={state.location.lng.toFixed(4)}
-          />
-        </View>
+        {state.coordinate ? (
+          <View style={styles.metaRow}>
+            <MetaItem
+              icon="latitude"
+              label="Lat"
+              value={state.coordinate.latitude.toFixed(4)}
+            />
+            <MetaItem
+              icon="longitude"
+              label="Lng"
+              value={state.coordinate.longitude.toFixed(4)}
+            />
+          </View>
+        ) : null}
       </Card>
 
-      {Platform.OS === "web" ? (
+      {!state.coordinate ? (
+        <EmptyState
+          title="Chưa có dữ liệu vị trí"
+          desc="Thiết bị chưa gửi tọa độ hợp lệ về server."
+        />
+      ) : Platform.OS === "web" ? (
         <View style={styles.mapFallback}>
           <MaterialCommunityIcons
             name="map-search-outline"
@@ -79,36 +147,18 @@ export default function MapScreen() {
         <View style={styles.mapCard}>
           <MapView
             style={StyleSheet.absoluteFill}
-            initialRegion={DEFAULT_REGION}
+            region={{
+              ...state.coordinate,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
             showsCompass
             showsScale
           >
-            <Circle
-              center={{
-                latitude: state.location.lat,
-                longitude: state.location.lng,
-              }}
-              radius={state.safeZoneRadiusM}
-              fillColor={`${zoneColor}20`}
-              strokeColor={`${zoneColor}88`}
-              strokeWidth={2}
-            />
             <Marker
-              coordinate={{
-                latitude: state.location.lat,
-                longitude: state.location.lng,
-              }}
+              coordinate={state.coordinate}
               title="Người dùng"
               description={`Cập nhật ${state.lastUpdate}`}
-            />
-            <Marker
-              coordinate={{
-                latitude: state.location.lat + 0.0018,
-                longitude: state.location.lng + 0.0016,
-              }}
-              pinColor={theme.colors.warning}
-              title="Vật cản gần nhất"
-              description={`Khoảng cách ${state.nearestObstacleM} m`}
             />
           </MapView>
 
@@ -118,12 +168,6 @@ export default function MapScreen() {
                 style={[styles.legendDot, { backgroundColor: theme.colors.primary }]}
               />
               <Text style={styles.legendText}>Vị trí hiện tại</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: zoneColor }]} />
-              <Text style={styles.legendText}>
-                Vùng an toàn {state.safeZoneRadiusM}m
-              </Text>
             </View>
           </View>
         </View>
@@ -147,16 +191,143 @@ export default function MapScreen() {
               />
             </View>
             <View>
-              <Text style={styles.itemTitle}>Vật cản gần nhất</Text>
+              <Text style={styles.itemTitle}>Nguy cơ gần nhất</Text>
               <Text style={styles.itemSub}>Khoảng cách ước tính</Text>
             </View>
           </View>
 
-          <Text style={styles.bigValue}>{state.nearestObstacleM} m</Text>
+          <Text style={styles.bigValue}>{state.nearestDistanceText}</Text>
         </View>
       </Card>
     </Screen>
   );
+}
+
+function mapScreenState(
+  locations: MobileLocation[],
+  dashboard: MobileDashboard | undefined,
+) {
+  const latestLocation = locations[0];
+  const coordinate =
+    extractLocationCoordinate(latestLocation) ??
+    extractDashboardCoordinate(dashboard?.last_location);
+  const lastUpdated =
+    latestLocation?.recorded_at ?? dashboard?.last_seen_at ?? dashboard?.device_last_seen_at;
+
+  return {
+    coordinate,
+    lastUpdate: formatDateTime(lastUpdated),
+    nearestDistanceText: formatDistance(dashboard?.nearest_distance_cm),
+    safetyText: mapSafetyText(dashboard),
+  };
+}
+
+function extractLocationCoordinate(
+  location: MobileLocation | undefined,
+): MapCoordinate | null {
+  if (!location) {
+    return null;
+  }
+
+  const coordinate = createCoordinate(location.lat, location.lng);
+
+  return coordinate ?? extractGeoJsonCoordinate(location.location);
+}
+
+function extractDashboardCoordinate(
+  location: DashboardLocation | undefined,
+): MapCoordinate | null {
+  return extractGeoJsonCoordinate(location ?? null);
+}
+
+function extractGeoJsonCoordinate(
+  location: { coordinates?: [number, number] } | null | undefined,
+): MapCoordinate | null {
+  const [longitude, latitude] = location?.coordinates ?? [];
+
+  return createCoordinate(latitude, longitude);
+}
+
+function createCoordinate(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): MapCoordinate | null {
+  if (
+    typeof latitude !== "number" ||
+    typeof longitude !== "number" ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+  };
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "Chưa có dữ liệu";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function formatDistance(distanceCm?: number | null) {
+  if (distanceCm == null) {
+    return "Chưa có dữ liệu";
+  }
+
+  return `${(distanceCm / 100).toFixed(1)} m`;
+}
+
+function mapSafetyText(dashboard: MobileDashboard | undefined) {
+  const status = dashboard?.current_safety_status?.toLowerCase();
+
+  if (status === "safe" || (!status && dashboard?.is_safe === true)) {
+    return "An toàn";
+  }
+
+  if (status === "warning" || status === "caution") {
+    return "Cần chú ý";
+  }
+
+  if (status === "danger" || status === "high" || (!status && dashboard?.is_safe === false)) {
+    return "Nguy hiểm";
+  }
+
+  return "Chưa có dữ liệu";
+}
+
+function pickStatusColor(dashboard: MobileDashboard | undefined) {
+  const status = dashboard?.current_safety_status?.toLowerCase();
+
+  if (status === "danger" || status === "high" || (!status && dashboard?.is_safe === false)) {
+    return theme.colors.danger;
+  }
+
+  if (status === "warning" || status === "caution") {
+    return theme.colors.warning;
+  }
+
+  return theme.colors.success;
 }
 
 function MetaItem({
