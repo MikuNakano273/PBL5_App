@@ -40,18 +40,14 @@ export type MobileDevice = {
   last_battery?: number | null;
 };
 
-export async function getMobileDashboard(userId: string): Promise<MobileDashboard> {
-  const response = await http.get<MobileDashboard>(
-    `/api/mobile/v1/dashboard/${encodeURIComponent(userId)}`,
-  );
+export async function getMobileDashboard(): Promise<MobileDashboard> {
+  const response = await http.get<MobileDashboard>("/api/mobile/v1/dashboard/me");
 
   return response.data;
 }
 
-export async function getMobileUserDevices(userId: string): Promise<MobileDevice[]> {
-  const response = await http.get<MobileDevice[]>(
-    `/api/mobile/v1/users/${encodeURIComponent(userId)}/devices`,
-  );
+export async function getMobileUserDevices(): Promise<MobileDevice[]> {
+  const response = await http.get<MobileDevice[]>("/api/mobile/v1/me/devices");
 
   return response.data;
 }

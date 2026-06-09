@@ -19,17 +19,13 @@ export type MobileLocation = {
 };
 
 export async function getMobileUserLocations(
-  userId: string,
   { limit = 1 }: { limit?: number } = {},
 ): Promise<MobileLocation[]> {
-  const response = await http.get<MobileLocation[]>(
-    `/api/mobile/v1/users/${encodeURIComponent(userId)}/locations`,
-    {
-      params: {
-        limit,
-      },
+  const response = await http.get<MobileLocation[]>("/api/mobile/v1/me/locations", {
+    params: {
+      limit,
     },
-  );
+  });
 
   return response.data;
 }

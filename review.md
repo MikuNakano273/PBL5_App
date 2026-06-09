@@ -45,14 +45,14 @@ Dang phu hop:
 Chua phu hop:
 - Demo account trong mock la `admin@gmail.com / abcd1234`, khong trung document server. Demo mobile dung `user@example.com / password123`.
 - Placeholder/copy dang nghieng ve Gmail/guardian, trong khi mobile endpoint chi nhan email user role `user`.
-- Sau login khong lay `/me`, nen app khong biet `user_id` that de goi dashboard/alerts/location.
+- Sau login can lay `/me` de co profile va `id` hien tai.
 
 Huong sua toi uu:
 - Bo `mockApi.getAuthSeed()` va gan demo credential tu config/dev constant: `user@example.com / password123`.
 - Khi login thanh cong:
   - luu token va fingerprint.
   - goi `GET /api/mobile/v1/me`.
-  - luu user `_id`, `email`, `full_name`, `phone`, `role`, `status` trong auth context.
+  - luu user `id`, `_id`, `email`, `full_name`, `phone`, `role`, `status` trong auth context; client moi dung `id`.
   - dieu huong dashboard.
 - Neu API tra `401 invalid_credentials`, hien message tu `error.message`. Neu `422`, hien loi validation ngan gon.
 
@@ -68,9 +68,9 @@ Chua phu hop:
 - Recent alerts trong dashboard tra `risk_level` va `triggered_at`, khong co `type`, `detail`, `time` nhu UI mock.
 
 Huong sua toi uu:
-- Sau khi co `user._id`, dung React Query goi:
-  - `GET /api/mobile/v1/dashboard/{user_id}`
-  - neu can pin/status thiet bi chi tiet: `GET /api/mobile/v1/users/{user_id}/devices`
+- Dung React Query goi:
+  - `GET /api/mobile/v1/dashboard/me`
+  - neu can pin/status thiet bi chi tiet: `GET /api/mobile/v1/me/devices`
 - Mapping:
   - `is_safe/current_safety_status` -> text "An toan", "Can chu y", "Nguy hiem".
   - `nearest_distance_cm / 100` -> hien thi met, lam tron 1 chu so.
@@ -91,11 +91,11 @@ Dang phu hop:
 Chua phu hop:
 - Dang goi `mockApi.getAlerts("U1")`, hard-code user id.
 - App type `ApiAlertItem` dang dung `type`, `createdAt`, `read`; server tra `alert_type`, `triggered_at`, `status`, `risk_level`, `message`, `distance_cm`, `resolved_at`.
-- Server endpoint `GET /api/mobile/v1/users/{user_id}/alerts` tra array truc tiep, khong co `{ items }`.
+- Server endpoint `GET /api/mobile/v1/me/alerts` tra array truc tiep, khong co `{ items }`.
 - App co `markAlertRead`, nhung server mobile alert API khong co endpoint mark alert read. Mark read hien chi co cho notification: `/installations/me/notifications/{notification_id}/read`.
 
 Huong sua toi uu:
-- Doi query sang `GET /api/mobile/v1/users/{user_id}/alerts?page=1&limit=20`, `user_id` lay tu `/me`.
+- Doi query sang `GET /api/mobile/v1/me/alerts?page=1&limit=20`.
 - Doi type theo server:
   - `alert_type`, `risk_level`, `status`, `triggered_at`, `distance_cm`.
 - Mapping UI:
@@ -115,7 +115,7 @@ Chua phu hop:
 - Server khong tra safe zone radius trong mobile API hien tai, nen app dang hard-code `safeZoneRadiusM`.
 
 Huong sua toi uu:
-- Dung `GET /api/mobile/v1/users/{user_id}/locations?limit=1` lam nguon toa do moi nhat. Neu array rong, fallback sang `dashboard.last_location`.
+- Dung `GET /api/mobile/v1/me/locations?limit=1` lam nguon toa do moi nhat. Neu array rong, fallback sang `dashboard.last_location`.
 - Dung `dashboard.nearest_distance_cm` de hien khoang cach nguy co gan nhat; khong ve marker vat can gia neu server khong tra toa do vat can.
 - Tam thoi bo safe zone circle hoac hien circle chi khi server tra cau hinh safe zone. Khong hard-code radius 120m/200m vi se sai nghiep vu.
 - Convert GeoJSON dung thu tu `coordinates: [lng, lat]`; voi React Native Maps phai gan `latitude = lat`, `longitude = lng`.
@@ -126,13 +126,13 @@ Dang phu hop:
 - UI co the tai su dung cho ho so nguoi dung va thiet bi lien ket.
 
 Chua phu hop:
-- Dang hard-code profile "nguoi khiem thi" voi age/gender/contacts/safeZone, nhung `GET /me` chi tra `_id`, `email`, `full_name`, `phone`, `role`, `status`.
-- Device info can lay tu `GET /api/mobile/v1/users/{user_id}/devices`, khong co trong `/me`.
+- Dang hard-code profile "nguoi khiem thi" voi age/gender/contacts/safeZone, nhung `GET /me` chi tra `id`, `_id`, `email`, `full_name`, `phone`, `role`, `status`.
+- Device info can lay tu `GET /api/mobile/v1/me/devices`, khong co trong `/me`.
 
 Huong sua toi uu:
 - Doi account screen thanh "Thong tin tai khoan":
   - ho ten, email, phone, role, status tu `/me`.
-  - thiet bi lien ket tu `/users/{user_id}/devices`, hien `name`, `device_code`, `status`, `last_battery`, `last_seen_at`.
+  - thiet bi lien ket tu `/me/devices`, hien `name`, `device_code`, `status`, `last_battery`, `last_seen_at`.
 - Bo cac field server chua co: age, gender, visionStatus, healthNotes, contacts, safeZone. Neu san pham bat buoc can cac field nay thi dua vao phan sua server ben duoi.
 
 ### 1.7. Settings screen
@@ -184,37 +184,18 @@ Khong nen doi response envelope cua server luc nay. Document da noi ro API tra o
 
 ### 2.2. Can bo sung de app dung duoc tot hon
 
-#### Them endpoint dashboard theo current user
+#### Endpoint dashboard theo current user
 
-Van de:
-- Mobile token chi duoc xem du lieu cua chinh user, nhung FE van phai truyen `user_id`. App phai lay `/me` truoc roi moi goi dashboard, va neu hard-code sai se gap `403`.
-
-Sua toi uu:
-- Them alias:
-  - `GET /api/mobile/v1/dashboard/me`
-  - `GET /api/mobile/v1/me/devices`
-  - `GET /api/mobile/v1/me/locations?limit=20`
-  - `GET /api/mobile/v1/me/alerts?page=1&limit=20`
-- Cac endpoint nay lay `user_id` tu JWT. Giu endpoint `{user_id}` hien co de tuong thich nguoc.
-
-Ly do:
-- Giam loi FE hard-code user id.
-- Dung hon voi security model "token chi xem chinh user".
+Trang thai theo API document moi:
+- Backend expose cac alias `/dashboard/me`, `/me/devices`, `/me/locations` va `/me/alerts`.
+- App moi nen dung cac alias de server tu lay `user_id` tu JWT.
+- Endpoint co `{user_id}` duoc giu de tuong thich nguoc va van tra `403` neu `user_id` khong khop token.
 
 #### Chuan hoa id field trong mobile user
 
-Van de:
-- `GET /me` tra `_id`, con admin/users va devices tra `id`. FE se phai xu ly ca `_id` va `id`.
-
-Sua toi uu:
-- Doi mobile `/me` response them `id` song song voi `_id` trong mot thoi gian:
-  - `id: "user-1"`
-  - `_id: "user-1"` de backward compatible.
-- Sau khi FE da doi het sang `id`, co the bo `_id` neu backend muon chuan hoa.
-
-Ly do:
-- Giam mapping dac biet o app.
-- Dong nhat voi `devices`, `alerts`, `notifications`.
+Trang thai theo API document moi:
+- `GET /me` tra ca `id` va `_id` cung gia tri; app moi dung `id`.
+- Cac resource devices, alerts va notifications van dung `id` theo response rieng cua tung endpoint.
 
 #### Bo sung profile fields neu san pham van can ho so nguoi khiem thi
 
@@ -291,6 +272,5 @@ Ly do:
 1. Sua app auth: API service, token storage, interceptor, login/refresh/logout, `/me`.
 2. Sua app dashboard/alerts/map/account de dung mobile endpoints va mapping field server.
 3. Bo hoac disable UI settings/profile ma server chua co du lieu.
-4. Server bo sung cac endpoint `me/*` alias va `id` cho `/me`.
+4. Dung `id` tu `/me` va cac alias `/dashboard/me`, `/me/devices`, `/me/locations`, `/me/alerts`.
 5. Neu san pham can profile/settings/safe zone, server bo sung API ro rang; sau do FE moi bat lai cac UI tuong ung.
-

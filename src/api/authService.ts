@@ -7,8 +7,8 @@ import { clearTokens, getRefreshToken, saveTokens } from "@/src/auth/tokenStorag
 import { API_BASE_URL, http, normalizeApiError } from "./http";
 
 export type MobileUser = {
-  id?: string;
-  _id?: string;
+  id: string;
+  _id: string;
   email: string;
   full_name?: string;
   phone?: string;
@@ -44,7 +44,7 @@ export type MobileLoginResult = {
 };
 
 export function getUserId(user: MobileUser) {
-  return user.id ?? user._id;
+  return user.id;
 }
 
 export async function loginMobile({

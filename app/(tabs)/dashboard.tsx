@@ -34,14 +34,14 @@ export default function DashboardScreen() {
     isLoading: isLoadingDashboard,
   } = useQuery({
     queryKey: ["mobile-dashboard", userId],
-    queryFn: () => getMobileDashboard(userId as string),
+    queryFn: getMobileDashboard,
     enabled: Boolean(userId),
     refetchInterval: 30000,
   });
 
   const { data: devices = [] } = useQuery({
     queryKey: ["mobile-devices", userId],
-    queryFn: () => getMobileUserDevices(userId as string),
+    queryFn: getMobileUserDevices,
     enabled: Boolean(userId),
   });
 

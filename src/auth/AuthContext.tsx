@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const userId = user ? (getUserId(user) ?? null) : null;
+  const userId = user ? getUserId(user) : null;
   const isAuthenticated = Boolean(user && userId);
 
   const value = useMemo(

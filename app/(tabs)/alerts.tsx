@@ -30,7 +30,7 @@ export default function AlertsScreen() {
 
   const { data: alerts = [], isLoading, isError } = useQuery({
     queryKey: ["mobile-alerts", userId, 1, 20],
-    queryFn: () => getMobileUserAlerts(userId as string, { page: 1, limit: 20 }),
+    queryFn: () => getMobileUserAlerts({ page: 1, limit: 20 }),
     enabled: Boolean(userId),
   });
 
@@ -141,10 +141,10 @@ export default function AlertsScreen() {
   );
 }
 
-function mapApiAlertToUi(alert: MobileAlert, index: number): AlertItem {
+function mapApiAlertToUi(alert: MobileAlert): AlertItem {
   return {
-    id: alert.id ?? `${alert.triggered_at}-${index}`,
-    title: alert.message || "Không có nội dung cảnh báo.",
+    id: alert.id,
+    title: alert.title || "Cảnh báo",
     type: mapRiskLevel(alert.risk_level),
     status: alert.status,
     detail: formatAlertDetail(alert),
@@ -154,6 +154,7 @@ function mapApiAlertToUi(alert: MobileAlert, index: number): AlertItem {
 
 function formatAlertDetail(alert: MobileAlert) {
   const parts = [
+    alert.message || null,
     formatAlertType(alert.alert_type),
     formatStatus(alert.status),
     alert.distance_cm == null ? null : `Khoảng cách ${alert.distance_cm} cm`,

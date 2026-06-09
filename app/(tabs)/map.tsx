@@ -35,7 +35,7 @@ export default function MapScreen() {
     isLoading: isLoadingLocations,
   } = useQuery({
     queryKey: ["mobile-locations", userId, 1],
-    queryFn: () => getMobileUserLocations(userId as string, { limit: 1 }),
+    queryFn: () => getMobileUserLocations({ limit: 1 }),
     enabled: Boolean(userId),
     refetchInterval: MAP_REFETCH_INTERVAL_MS,
   });
@@ -46,7 +46,7 @@ export default function MapScreen() {
     isLoading: isLoadingDashboard,
   } = useQuery({
     queryKey: ["mobile-dashboard", userId],
-    queryFn: () => getMobileDashboard(userId as string),
+    queryFn: getMobileDashboard,
     enabled: Boolean(userId),
     refetchInterval: MAP_REFETCH_INTERVAL_MS,
   });

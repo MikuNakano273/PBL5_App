@@ -33,7 +33,7 @@ export default function AccountScreen() {
     isLoading: isLoadingDevices,
   } = useQuery({
     queryKey: ["mobile-devices", userId],
-    queryFn: () => getMobileUserDevices(userId as string),
+    queryFn: getMobileUserDevices,
     enabled: Boolean(userId),
   });
 
