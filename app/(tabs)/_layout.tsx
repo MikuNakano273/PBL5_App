@@ -1,8 +1,25 @@
 import { theme } from "@/constants/theme";
+import {
+  getMobileNotifications,
+  mobileNotificationsQueryKey,
+} from "@/src/api/notificationService";
+import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs } from "expo-router";
 
 export default function TabsLayout() {
+  const { userId } = useAuth();
+  const { data: notifications = [] } = useQuery({
+    queryKey: mobileNotificationsQueryKey,
+    queryFn: getMobileNotifications,
+    enabled: Boolean(userId),
+    staleTime: 30000,
+  });
+  const unreadNotificationCount = notifications.filter(
+    (notification) => !notification.read_at,
+  ).length;
+
   return (
     <Tabs
       screenOptions={{
@@ -62,6 +79,27 @@ export default function TabsLayout() {
         name="alerts"
         options={{
           title: "Alerts",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          tabBarBadge: unreadNotificationCount || undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.danger,
+            color: theme.colors.background,
+            fontSize: 10,
+            fontWeight: "800",
+          },
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="bell-outline"
