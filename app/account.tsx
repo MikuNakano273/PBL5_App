@@ -1,141 +1,206 @@
 import Card from "@/components/Card";
+import EmptyState from "@/components/EmptyState";
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
+import { getMobileMe, type MobileUser } from "@/src/api/authService";
+import {
+  getMobileUserDevices,
+  type MobileDevice,
+} from "@/src/api/dashboardService";
+import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-const blindProfile = {
-  fullName: "Nguyễn Minh An",
-  age: "28 tuổi",
-  gender: "Nam",
-  visionStatus: "Khiếm thị hoàn toàn",
-  supportNeed: "Cần hỗ trợ định vị và cảnh báo vật cản",
-  homeArea: "Hải Châu, Đà Nẵng",
-  safeZone: "Bán kính 200m quanh nhà",
-  linkedDevice: "NC-01 Smart Cane",
-  deviceStatus: "Đang kết nối ổn định",
-  lastActivity: "Cập nhật 1 phút trước",
-  healthNotes: [
-    "Ưu tiên cảnh báo bằng âm thanh và rung",
-    "Tự di chuyển quen thuộc trong khu vực an toàn",
-    "Cần thông báo ngay khi rời vùng an toàn",
-  ],
-  contacts: [
-    { label: "Liên hệ khẩn", value: "Chị Lan • 0918 456 789" },
-    { label: "Bác sĩ hỗ trợ", value: "BS. Trần Quốc Huy • 0902 888 115" },
-  ],
-};
-
 export default function AccountScreen() {
+  const { isLoadingAuth, user: authenticatedUser, userId } = useAuth();
+
+  const {
+    data: user,
+    isLoading: isLoadingUser,
+  } = useQuery({
+    queryKey: ["mobile-me", userId],
+    queryFn: getMobileMe,
+    enabled: Boolean(userId),
+    placeholderData: authenticatedUser ?? undefined,
+  });
+
+  const {
+    data: devices = [],
+    isError: isDevicesError,
+    isLoading: isLoadingDevices,
+  } = useQuery({
+    queryKey: ["mobile-devices", userId],
+    queryFn: () => getMobileUserDevices(userId as string),
+    enabled: Boolean(userId),
+  });
+
+  if (isLoadingAuth || (userId && isLoadingUser)) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Đang tải tài khoản..."
+          desc="Vui lòng chờ trong giây lát."
+        />
+      </Screen>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Chưa có phiên đăng nhập"
+          desc="Vui lòng đăng nhập để xem thông tin tài khoản."
+        />
+      </Screen>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Không tải được tài khoản"
+          desc="Có lỗi khi lấy thông tin từ server, vui lòng thử lại."
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <Card style={styles.heroCard}>
-          <View style={styles.badge}>
-            <MaterialCommunityIcons
-              name="account-heart-outline"
-              size={14}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.badgeText}>Hồ sơ người khiếm thị</Text>
-          </View>
+        <AccountHero user={user} />
 
-          <Text style={styles.name}>{blindProfile.fullName}</Text>
-          <Text style={styles.role}>{blindProfile.supportNeed}</Text>
-
-          <View style={styles.metricRow}>
-            <MetricBlock
-              icon="eye-off-outline"
-              label="Tình trạng thị lực"
-              value={blindProfile.visionStatus}
-            />
-            <MetricBlock
-              icon="access-point"
-              label="Kết nối"
-              value="Ổn định"
-              highlight="success"
-            />
-          </View>
-
-          <View style={styles.notice}>
-            <MaterialCommunityIcons
-              name="map-marker-radius-outline"
-              size={18}
-              color={theme.colors.primary}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.noticeTitle}>{blindProfile.lastActivity}</Text>
-              <Text style={styles.noticeText}>
-                Hệ thống theo dõi vị trí, vùng an toàn và cảnh báo vật cản từ
-                gậy thông minh của người khiếm thị.
-              </Text>
-            </View>
-          </View>
-        </Card>
-
-        <SectionTitle title="Thông tin cá nhân" />
-        <Card style={styles.sectionCard}>
-          <InfoRow icon="calendar-account-outline" label="Tuổi" value={blindProfile.age} />
-          <Divider />
-          <InfoRow icon="gender-male-female" label="Giới tính" value={blindProfile.gender} />
-          <Divider />
-          <InfoRow
-            icon="map-marker-outline"
-            label="Khu vực sinh hoạt"
-            value={blindProfile.homeArea}
-          />
-          <Divider />
-          <InfoRow icon="shield-home-outline" label="Vùng an toàn" value={blindProfile.safeZone} />
-        </Card>
-
-        <SectionTitle title="Ghi chú hỗ trợ" />
-        <Card style={styles.sectionCard}>
-          {blindProfile.healthNotes.map((item) => (
-            <View key={item} style={styles.permissionRow}>
-              <View style={styles.permissionDot}>
-                <MaterialCommunityIcons
-                  name="check"
-                  size={14}
-                  color={theme.colors.primary}
-                />
-              </View>
-              <Text style={styles.permissionText}>{item}</Text>
-            </View>
-          ))}
-        </Card>
-
-        <SectionTitle title="Hỗ trợ liên quan" />
+        <SectionTitle title="Thông tin tài khoản" />
         <Card style={styles.sectionCard}>
           <InfoRow
-            icon="walk"
-            label="Thiết bị gậy"
-            value={blindProfile.linkedDevice}
+            icon="email-outline"
+            label="Email"
+            value={displayValue(user.email)}
           />
           <Divider />
           <InfoRow
-            icon="access-point-network"
-            label="Trạng thái thiết bị"
-            value={blindProfile.deviceStatus}
-            valueColor={theme.colors.success}
+            icon="phone-outline"
+            label="Số điện thoại"
+            value={displayValue(user.phone)}
           />
-          {blindProfile.contacts.map((contact) => (
-            <React.Fragment key={contact.label}>
-              <Divider />
-              <InfoRow
-                icon="card-account-phone-outline"
-                label={contact.label}
-                value={contact.value}
-              />
-            </React.Fragment>
-          ))}
+          <Divider />
+          <InfoRow
+            icon="account-key-outline"
+            label="Vai trò"
+            value={displayValue(user.role)}
+          />
+          <Divider />
+          <InfoRow
+            icon="account-check-outline"
+            label="Trạng thái"
+            value={displayValue(user.status)}
+            valueColor={getStatusColor(user.status)}
+          />
         </Card>
+
+        <SectionTitle title="Thiết bị liên kết" />
+        {isLoadingDevices ? (
+          <EmptyState
+            title="Đang tải thiết bị..."
+            desc="Vui lòng chờ trong giây lát."
+          />
+        ) : isDevicesError && devices.length === 0 ? (
+          <EmptyState
+            title="Không tải được thiết bị"
+            desc="Có lỗi khi lấy danh sách thiết bị từ server."
+          />
+        ) : devices.length === 0 ? (
+          <EmptyState
+            title="Chưa có thiết bị liên kết"
+            desc="Tài khoản này hiện chưa được liên kết với thiết bị nào."
+          />
+        ) : (
+          devices.map((device) => <DeviceCard key={device.id} device={device} />)
+        )}
       </ScrollView>
     </Screen>
+  );
+}
+
+function AccountHero({ user }: { user: MobileUser }) {
+  return (
+    <Card style={styles.heroCard}>
+      <View style={styles.badge}>
+        <MaterialCommunityIcons
+          name="account-circle-outline"
+          size={14}
+          color={theme.colors.primary}
+        />
+        <Text style={styles.badgeText}>Tài khoản NavicAid</Text>
+      </View>
+
+      <Text style={styles.name}>{displayValue(user.full_name)}</Text>
+      <Text style={styles.email}>{displayValue(user.email)}</Text>
+
+      <View style={styles.metricRow}>
+        <MetricBlock
+          icon="account-key-outline"
+          label="Vai trò"
+          value={displayValue(user.role)}
+        />
+        <MetricBlock
+          icon="account-check-outline"
+          label="Trạng thái"
+          value={displayValue(user.status)}
+          accent={getStatusColor(user.status)}
+        />
+      </View>
+    </Card>
+  );
+}
+
+function DeviceCard({ device }: { device: MobileDevice }) {
+  return (
+    <Card style={styles.deviceCard}>
+      <View style={styles.deviceHeader}>
+        <View style={styles.deviceIcon}>
+          <MaterialCommunityIcons
+            name="access-point"
+            size={20}
+            color={theme.colors.primary}
+          />
+        </View>
+        <View style={styles.deviceTitleWrap}>
+          <Text style={styles.deviceName}>{displayValue(device.name)}</Text>
+          <Text style={styles.deviceCode}>
+            {displayValue(device.device_code)}
+          </Text>
+        </View>
+      </View>
+
+      <Divider />
+      <InfoRow
+        icon="access-point-network"
+        label="Trạng thái"
+        value={displayValue(device.status)}
+        valueColor={getStatusColor(device.status)}
+      />
+      <Divider />
+      <InfoRow
+        icon="battery-medium"
+        label="Pin gần nhất"
+        value={formatBattery(device.last_battery)}
+      />
+      <Divider />
+      <InfoRow
+        icon="clock-outline"
+        label="Lần cuối kết nối"
+        value={formatDateTime(device.last_seen_at)}
+      />
+    </Card>
   );
 }
 
@@ -143,23 +208,20 @@ function MetricBlock({
   icon,
   label,
   value,
-  highlight,
+  accent = theme.colors.primary,
 }: {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   label: string;
   value: string;
-  highlight?: "success";
+  accent?: string;
 }) {
-  const accent =
-    highlight === "success" ? theme.colors.success : theme.colors.primary;
-
   return (
     <View style={styles.metricBlock}>
       <View style={[styles.metricIcon, { backgroundColor: `${accent}16` }]}>
         <MaterialCommunityIcons name={icon} size={18} color={accent} />
       </View>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={[styles.metricValue, { color: accent }]}>{value}</Text>
     </View>
   );
 }
@@ -184,7 +246,7 @@ function InfoRow({
           color={theme.colors.primary}
         />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={[styles.infoValue, valueColor && { color: valueColor }]}>
           {value}
@@ -196,6 +258,45 @@ function InfoRow({
 
 function Divider() {
   return <View style={styles.divider} />;
+}
+
+function displayValue(value?: string | null) {
+  return value?.trim() || "Chưa có dữ liệu";
+}
+
+function formatBattery(battery?: number | null) {
+  return battery == null ? "Chưa có dữ liệu" : `${battery}%`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "Chưa có dữ liệu";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function getStatusColor(status?: string | null) {
+  const normalizedStatus = status?.toLowerCase();
+
+  if (normalizedStatus === "active" || normalizedStatus === "online") {
+    return theme.colors.success;
+  }
+
+  if (normalizedStatus === "inactive" || normalizedStatus === "offline") {
+    return theme.colors.danger;
+  }
+
+  return theme.colors.text;
 }
 
 const styles = StyleSheet.create({
@@ -229,10 +330,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
   },
-  role: {
+  email: {
     color: theme.colors.subText,
     fontSize: 13,
-    marginTop: 4,
+    marginTop: -theme.spacing(1.5),
   },
   metricRow: {
     flexDirection: "row",
@@ -259,34 +360,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   metricValue: {
-    color: theme.colors.text,
     fontSize: 14,
     fontWeight: "800",
     marginTop: 4,
   },
-  notice: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-    padding: theme.spacing(1.5),
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: "#D8E5FF",
-  },
-  noticeTitle: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  noticeText: {
-    color: theme.colors.subText,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4,
-  },
   sectionCard: {
     gap: theme.spacing(1),
+  },
+  deviceCard: {
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(1.5),
+  },
+  deviceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  deviceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${theme.colors.primary}14`,
+  },
+  deviceTitleWrap: {
+    flex: 1,
+  },
+  deviceName: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  deviceCode: {
+    color: theme.colors.subText,
+    fontSize: 12,
+    marginTop: 4,
   },
   infoRow: {
     flexDirection: "row",
@@ -302,6 +411,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  infoContent: {
+    flex: 1,
+  },
   infoLabel: {
     color: theme.colors.subText,
     fontSize: 12,
@@ -316,25 +428,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: theme.colors.border,
     marginLeft: 52,
-  },
-  permissionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 4,
-  },
-  permissionDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 99,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: `${theme.colors.primary}16`,
-  },
-  permissionText: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "700",
   },
 });
