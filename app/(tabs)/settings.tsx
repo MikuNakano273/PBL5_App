@@ -39,22 +39,24 @@ export default function SettingsScreen() {
       <SectionTitle title="Cấu hình thiết bị" />
 
       <Card style={{ gap: theme.spacing(1) }}>
-        <SettingRow
+        <InfoRow
           icon="bell-outline"
           title="Bật cảnh báo"
           desc="Hiển thị cảnh báo khi gặp nguy hiểm"
+          comingSoon
         />
         <Divider />
-        <SettingRow
-          icon="access-point"
-          title="Thông báo real-time"
-          desc="Nhận cập nhật tức thì"
+        <InfoRow
+          icon="bell-badge-outline"
+          title="Thông báo đẩy"
+          desc="Ứng dụng nhận cảnh báo qua thông báo đẩy và tự cập nhật dữ liệu khi mở app."
         />
         <Divider />
-        <SettingRow
+        <InfoRow
           icon="vibrate"
           title="Rung khi cảnh báo"
           desc="Tăng độ nhận biết"
+          comingSoon
         />
       </Card>
 
@@ -68,7 +70,7 @@ export default function SettingsScreen() {
           onPress={() => router.push("../account")}
         />
         <Divider />
-        <PressableRow
+        <InfoRow
           icon="information-outline"
           title="Thông tin ứng dụng"
           desc="Phiên bản, điều khoản"
@@ -87,14 +89,16 @@ export default function SettingsScreen() {
   );
 }
 
-function SettingRow({
+function InfoRow({
   icon,
   title,
   desc,
+  comingSoon,
 }: {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   title: string;
   desc?: string;
+  comingSoon?: boolean;
 }) {
   return (
     <View style={styles.row}>
@@ -116,9 +120,11 @@ function SettingRow({
         {!!desc && <Text style={styles.desc}>{desc}</Text>}
       </View>
 
-      <View style={styles.comingSoonBadge}>
-        <Text style={styles.comingSoonText}>Sắp hỗ trợ</Text>
-      </View>
+      {comingSoon && (
+        <View style={styles.comingSoonBadge}>
+          <Text style={styles.comingSoonText}>Sắp hỗ trợ</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -135,7 +141,7 @@ function PressableRow({
   title: string;
   desc?: string;
   danger?: boolean;
-  onPress?: () => void;
+  onPress: () => void;
   disabled?: boolean;
 }) {
   const color = danger ? theme.colors.danger : theme.colors.primary;
