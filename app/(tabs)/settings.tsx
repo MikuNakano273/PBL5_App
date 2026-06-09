@@ -4,19 +4,34 @@ import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router, type Href } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
-  const [enableAlerts, setEnableAlerts] = useState(true);
-  const [enableRealtime, setEnableRealtime] = useState(true);
-  const [vibration, setVibration] = useState(true);
+  const queryClient = useQueryClient();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    router.replace("/login" as Href);
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+    } catch {
+      Alert.alert(
+        "Đã đăng xuất trên thiết bị",
+        "Không thể xác nhận thu hồi phiên trên server. Vui lòng kiểm tra kết nối mạng.",
+      );
+    } finally {
+      queryClient.clear();
+      router.replace("/login");
+    }
   };
 
   return (
@@ -28,51 +43,18 @@ export default function SettingsScreen() {
           icon="bell-outline"
           title="Bật cảnh báo"
           desc="Hiển thị cảnh báo khi gặp nguy hiểm"
-          right={
-            <Switch
-              value={enableAlerts}
-              onValueChange={setEnableAlerts}
-              trackColor={{
-                false: "#2A3550",
-                true: `${theme.colors.primary}66`,
-              }}
-              thumbColor={theme.colors.text}
-            />
-          }
         />
         <Divider />
         <SettingRow
           icon="access-point"
           title="Thông báo real-time"
           desc="Nhận cập nhật tức thì"
-          right={
-            <Switch
-              value={enableRealtime}
-              onValueChange={setEnableRealtime}
-              trackColor={{
-                false: "#2A3550",
-                true: `${theme.colors.primary}66`,
-              }}
-              thumbColor={theme.colors.text}
-            />
-          }
         />
         <Divider />
         <SettingRow
           icon="vibrate"
           title="Rung khi cảnh báo"
           desc="Tăng độ nhận biết"
-          right={
-            <Switch
-              value={vibration}
-              onValueChange={setVibration}
-              trackColor={{
-                false: "#2A3550",
-                true: `${theme.colors.primary}66`,
-              }}
-              thumbColor={theme.colors.text}
-            />
-          }
         />
       </Card>
 
@@ -95,9 +77,10 @@ export default function SettingsScreen() {
         <PressableRow
           icon="logout"
           title="Đăng xuất"
-          desc="Thoát tài khoản hiện tại"
+          desc={isLoggingOut ? "Đang đăng xuất..." : "Thoát tài khoản hiện tại"}
           danger
           onPress={handleLogout}
+          disabled={isLoggingOut}
         />
       </Card>
     </Screen>
@@ -108,12 +91,10 @@ function SettingRow({
   icon,
   title,
   desc,
-  right,
 }: {
-  icon: any;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   title: string;
   desc?: string;
-  right: React.ReactNode;
 }) {
   return (
     <View style={styles.row}>
@@ -135,7 +116,9 @@ function SettingRow({
         {!!desc && <Text style={styles.desc}>{desc}</Text>}
       </View>
 
-      {right}
+      <View style={styles.comingSoonBadge}>
+        <Text style={styles.comingSoonText}>Sắp hỗ trợ</Text>
+      </View>
     </View>
   );
 }
@@ -146,16 +129,22 @@ function PressableRow({
   desc,
   danger,
   onPress,
+  disabled,
 }: {
-  icon: any;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   title: string;
   desc?: string;
   danger?: boolean;
   onPress?: () => void;
+  disabled?: boolean;
 }) {
   const color = danger ? theme.colors.danger : theme.colors.primary;
   return (
-    <Pressable style={styles.row} onPress={onPress}>
+    <Pressable
+      style={[styles.row, disabled && styles.disabledRow]}
+      onPress={onPress}
+      disabled={disabled}
+    >
       <View style={[styles.iconWrap, { backgroundColor: `${color}18` }]}>
         <MaterialCommunityIcons name={icon} size={20} color={color} />
       </View>
@@ -196,6 +185,19 @@ const styles = StyleSheet.create({
   },
   title: { color: theme.colors.text, fontSize: 14, fontWeight: "900" },
   desc: { color: theme.colors.subText, fontSize: 12, marginTop: 2 },
-
+  comingSoonBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: theme.radius.pill,
+    backgroundColor: `${theme.colors.subText}14`,
+  },
+  comingSoonText: {
+    color: theme.colors.subText,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  disabledRow: {
+    opacity: 0.6,
+  },
   divider: { height: 1, backgroundColor: theme.colors.border, marginLeft: 52 },
 });

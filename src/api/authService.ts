@@ -134,10 +134,21 @@ export async function logoutMobile(): Promise<void> {
 
   try {
     if (refreshToken) {
-      await http.post("/api/mobile/v1/auth/logout", {
-        refresh_token: refreshToken,
-      });
+      await axios.post(
+        `${API_BASE_URL}/api/mobile/v1/auth/logout`,
+        {
+          refresh_token: refreshToken,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        },
+      );
     }
+  } catch (error) {
+    throw normalizeApiError(error);
   } finally {
     await clearTokens();
   }
