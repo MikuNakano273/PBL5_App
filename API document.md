@@ -156,7 +156,7 @@ Access token có hạn mặc định `15` phút. Refresh token có hạn mặc �
 ### Flow khuyến nghị
 
 1. Gọi `POST /api/mobile/v1/auth/login`.
-2. Lưu `access_token`, `refresh_token`, `device_fingerprint`.
+2. Lưu `access_token`, `refresh_token`.
 3. Với API mobile cần đăng nhập, gửi `Authorization: Bearer <access_token>`.
 4. Nếu nhận `401`, gọi `POST /api/mobile/v1/auth/refresh`.
 5. Nếu refresh fail, logout local và đưa user về màn login.
@@ -237,10 +237,7 @@ Request:
 ```json
 {
   "email": "user@example.com",
-  "password": "password123",
-  "device_fingerprint": "phone-unique-id-001",
-  "device_name": "iPhone 15",
-  "platform": "ios"
+  "password": "password123"
 }
 ```
 
@@ -250,9 +247,6 @@ Field rules:
 |---|---|
 | `email` | Email hợp lệ |
 | `password` | 8-128 ký tự |
-| `device_fingerprint` | 3-255 ký tự |
-| `device_name` | 1-255 ký tự |
-| `platform` | 2-50 ký tự, ví dụ `android`, `ios`, `web` |
 
 Response:
 
@@ -525,7 +519,7 @@ Base path:
 Nhóm endpoint này không dùng JWT trong code hiện tại. Thay vào đó cần header:
 
 ```http
-X-Device-Fingerprint: <device_fingerprint_da_dung_khi_login>
+X-Device-Fingerprint: <device_fingerprint_do_app_tao_rieng>
 ```
 
 Nếu thiếu header: `400 missing_installation_header`.
@@ -1103,19 +1097,16 @@ export default api;
 const response = await api.post("/api/mobile/v1/auth/login", {
   email: "user@example.com",
   password: "password123",
-  device_fingerprint: "phone-unique-id-001",
-  device_name: "Pixel 8",
-  platform: "android",
 });
 
 localStorage.setItem("access_token", response.data.access_token);
 localStorage.setItem("refresh_token", response.data.refresh_token);
-localStorage.setItem("device_fingerprint", "phone-unique-id-001");
 ```
 
 ### Gọi notification cần fingerprint header
 
 ```ts
+// Fingerprint được app tạo và lưu riêng, không gửi trong request login.
 const fingerprint = localStorage.getItem("device_fingerprint");
 
 const response = await api.get("/api/mobile/v1/installations/me/notifications", {

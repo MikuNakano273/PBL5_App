@@ -25,6 +25,18 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Test alerts
+
+In development, Settings includes a **Developer** section with the **Tạo cảnh báo thử** button. The button calls `POST /api/mobile/v1/dev/test-alert` with the current mobile session. If the server does not expose that endpoint (`404` or `405`), the app shows a local mock alert notification instead.
+
+For a non-development preview build, explicitly enable the button:
+
+```bash
+EXPO_PUBLIC_SHOW_DEV_TOOLS=true
+```
+
+Do not set `EXPO_PUBLIC_SHOW_DEV_TOOLS=true` in production builds.
+
 ## Get a fresh project
 
 When you're ready, run:

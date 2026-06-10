@@ -1,7 +1,5 @@
 import axios from "axios";
-import { Platform } from "react-native";
 
-import { getDeviceFingerprint } from "@/src/auth/deviceFingerprint";
 import { clearTokens, getRefreshToken, saveTokens } from "@/src/auth/tokenStorage";
 
 import { API_BASE_URL, http, normalizeApiError } from "./http";
@@ -19,17 +17,9 @@ export type MobileUser = {
 export type MobileLoginPayload = {
   email: string;
   password: string;
-  device_fingerprint: string;
-  device_name: string;
-  platform: string;
 };
 
-export type MobileLoginInput = {
-  email: string;
-  password: string;
-  device_name?: string;
-  platform?: string;
-};
+export type MobileLoginInput = MobileLoginPayload;
 
 export type UpdateMobileMeInput = {
   full_name: string;
@@ -54,7 +44,6 @@ export type TokenResponse = {
 export type MobileLoginResult = {
   user: MobileUser;
   tokens: TokenResponse;
-  device_fingerprint: string;
 };
 
 export function getUserId(user: MobileUser) {
@@ -64,16 +53,10 @@ export function getUserId(user: MobileUser) {
 export async function loginMobile({
   email,
   password,
-  device_name = "NavicAid app",
-  platform = Platform.OS,
 }: MobileLoginInput): Promise<MobileLoginResult> {
-  const deviceFingerprint = await getDeviceFingerprint();
   const payload: MobileLoginPayload = {
     email,
     password,
-    device_fingerprint: deviceFingerprint,
-    device_name,
-    platform,
   };
 
   let tokens: TokenResponse;
@@ -104,7 +87,6 @@ export async function loginMobile({
   return {
     user,
     tokens,
-    device_fingerprint: deviceFingerprint,
   };
 }
 

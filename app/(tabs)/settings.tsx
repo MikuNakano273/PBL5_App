@@ -3,6 +3,11 @@ import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/src/auth/AuthContext";
+import {
+  createDevTestAlert,
+  shouldShowDevTools,
+} from "@/src/dev/devAlertService";
+import { showAlertLocalNotification } from "@/src/notifications/localNotificationService";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -10,9 +15,45 @@ import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function SettingsScreen() {
-  const { logout } = useAuth();
+  const { logout, userId } = useAuth();
   const queryClient = useQueryClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isCreatingTestAlert, setIsCreatingTestAlert] = useState(false);
+
+  const handleCreateTestAlert = async () => {
+    if (isCreatingTestAlert) {
+      return;
+    }
+
+    setIsCreatingTestAlert(true);
+
+    try {
+      const result = await createDevTestAlert();
+      await showAlertLocalNotification(result.alert);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["mobile-dashboard", userId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["mobile-alerts", userId],
+        }),
+      ]);
+
+      Alert.alert(
+        "Đã tạo cảnh báo thử",
+        result.source === "server"
+          ? "Server đã tạo alert thật và dữ liệu đã được làm mới."
+          : "Endpoint dev chưa có, ứng dụng đã hiển thị alert mock local.",
+      );
+    } catch {
+      Alert.alert(
+        "Không tạo được cảnh báo thử",
+        "Vui lòng kiểm tra phiên đăng nhập, kết nối mạng và cấu hình dev endpoint.",
+      );
+    } finally {
+      setIsCreatingTestAlert(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -59,6 +100,26 @@ export default function SettingsScreen() {
           comingSoon
         />
       </Card>
+
+      {shouldShowDevTools && (
+        <>
+          <SectionTitle title="Developer" />
+
+          <Card style={{ gap: theme.spacing(1) }}>
+            <PressableRow
+              icon="alert-plus-outline"
+              title="Tạo cảnh báo thử"
+              desc={
+                isCreatingTestAlert
+                  ? "Đang tạo cảnh báo..."
+                  : "Gọi dev endpoint hoặc hiển thị alert mock local"
+              }
+              onPress={handleCreateTestAlert}
+              disabled={isCreatingTestAlert}
+            />
+          </Card>
+        </>
+      )}
 
       <SectionTitle title="Hệ thống" />
 
