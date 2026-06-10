@@ -1,5 +1,9 @@
 import { theme } from "@/constants/theme";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
+import { notificationMode } from "@/src/notifications/notificationMode";
+import { useNotificationResponseHandler } from "@/src/notifications/useNotificationResponseHandler";
+import { usePushNotificationSetup } from "@/src/notifications/usePushNotificationSetup";
+import { useAlertPollingWatcher } from "@/src/realtime/useAlertPollingWatcher";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, usePathname } from "expo-router";
@@ -14,6 +18,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AuthNavigationGuard />
+        {notificationMode !== "off" && <NotificationResponseHandler />}
+        {notificationMode === "local-polling" && <AlertPollingWatcher />}
+        {notificationMode === "push" && <PushNotificationSetup />}
         <StatusBar style="dark" backgroundColor="#ffffff" />
         <Stack>
           <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -55,6 +62,24 @@ export default function RootLayout() {
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+function NotificationResponseHandler() {
+  useNotificationResponseHandler();
+
+  return null;
+}
+
+function AlertPollingWatcher() {
+  useAlertPollingWatcher();
+
+  return null;
+}
+
+function PushNotificationSetup() {
+  usePushNotificationSetup();
+
+  return null;
 }
 
 function AuthNavigationGuard() {

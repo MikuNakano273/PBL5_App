@@ -27,6 +27,14 @@ export type MobileNotification = {
   event: MobileNotificationEvent;
 };
 
+export type PushTokenProvider = "fcm" | "apns";
+
+export type RegisterPushTokenInput = {
+  push_token: string;
+  provider: PushTokenProvider;
+  platform: "android" | "ios";
+};
+
 async function getInstallationHeaders() {
   const deviceFingerprint = await getDeviceFingerprint();
 
@@ -34,6 +42,23 @@ async function getInstallationHeaders() {
     "Content-Type": "application/json",
     "X-Device-Fingerprint": deviceFingerprint,
   };
+}
+
+export async function registerMobilePushToken(
+  input: RegisterPushTokenInput,
+): Promise<void> {
+  try {
+    await axios.post(
+      `${API_BASE_URL}${INSTALLATION_API_PATH}/push-token`,
+      input,
+      {
+        headers: await getInstallationHeaders(),
+        timeout: 10000,
+      },
+    );
+  } catch (error) {
+    throw normalizeApiError(error);
+  }
 }
 
 export async function getMobileNotifications(): Promise<MobileNotification[]> {
