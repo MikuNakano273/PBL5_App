@@ -37,6 +37,51 @@ EXPO_PUBLIC_SHOW_DEV_TOOLS=true
 
 Do not set `EXPO_PUBLIC_SHOW_DEV_TOOLS=true` in production builds.
 
+## Manual auth session checks
+
+This project does not currently include an automated test runner. Run these
+checks after changing authentication or HTTP interceptor behavior:
+
+1. Make `POST /api/mobile/v1/auth/login` succeed, then make
+   `GET /api/mobile/v1/me` fail. Confirm the login error is shown and both
+   access and refresh tokens are removed from device storage.
+2. Log in, expire the access token, and make
+   `POST /api/mobile/v1/auth/refresh` fail. Confirm the app clears the current
+   user and cached user data, removes both tokens, and navigates to `/login`.
+3. Trigger multiple authenticated requests with an expired access token.
+   Confirm only one refresh request runs and a failed refresh consistently
+   returns the app to `/login`.
+4. Log in normally and confirm successful refresh still retries the original
+   request without changing the login flow or API request/response contract.
+
+## Manual in-app notification checks
+
+1. While logged in, trigger two normal alerts. Confirm banners appear one at a
+   time and each automatically closes after 5 seconds.
+2. Trigger a `danger` or `high` risk alert. Confirm its banner remains visible
+   until **Đóng thông báo** or **Xem chi tiết** is pressed.
+3. Deliver the same alert through polling and push notification. Confirm only
+   one banner appears for the shared `alert_id`.
+4. Deliver notifications without an `alert_id` but with the same notification
+   event ID. Confirm only one banner appears.
+5. Press **Xem chi tiết** and confirm the app opens `/alerts/[id]`.
+6. Log out while banners are queued. Confirm the visible banner disappears and
+   queued banners do not appear on the login screen.
+
+## Manual alert polling checks
+
+1. Return paginated alert data where the previously seen alert is on page 2 or
+   later. Confirm polling requests subsequent pages, stops after finding that
+   alert, and displays each newer `alert_id` once.
+2. Return paginated data without the previously seen alert. Confirm polling
+   continues until pagination reports no next page.
+3. Return an array or envelope without pagination metadata. Confirm only page 1
+   is processed and a development-only warning is logged once.
+4. Return duplicate alert IDs across page boundaries. Confirm only one in-app
+   banner and one local notification are created for each new alert ID.
+5. Set notification mode to `local-polling` and confirm new alerts create local
+   notifications. In other modes, confirm polling does not create them.
+
 ## Get a fresh project
 
 When you're ready, run:

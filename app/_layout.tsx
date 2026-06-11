@@ -1,6 +1,11 @@
+import InAppNotificationBanner from "@/components/InAppNotificationBanner";
 import { theme } from "@/constants/theme";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
-import { notificationMode } from "@/src/notifications/notificationMode";
+import { InAppNotificationProvider } from "@/src/notifications/InAppNotificationContext";
+import {
+  isExpoGo,
+  notificationMode,
+} from "@/src/notifications/notificationMode";
 import { useNotificationResponseHandler } from "@/src/notifications/useNotificationResponseHandler";
 import { usePushNotificationSetup } from "@/src/notifications/usePushNotificationSetup";
 import { useAlertPollingWatcher } from "@/src/realtime/useAlertPollingWatcher";
@@ -10,57 +15,65 @@ import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AuthNavigationGuard />
-        {notificationMode !== "off" && <NotificationResponseHandler />}
-        {notificationMode === "local-polling" && <AlertPollingWatcher />}
-        {notificationMode === "push" && <PushNotificationSetup />}
-        <StatusBar style="dark" backgroundColor="#ffffff" />
-        <Stack>
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="account"
-            options={{
-              title: "Thông tin tài khoản",
-              headerBackVisible: false,
-              headerLeft: () => <BackButton />,
-            }}
-          />
-          <Stack.Screen
-            name="account/edit"
-            options={{
-              title: "Chỉnh sửa hồ sơ",
-              headerBackVisible: false,
-              headerLeft: () => <BackButton />,
-            }}
-          />
-          <Stack.Screen
-            name="account/change-password"
-            options={{
-              title: "Đổi mật khẩu",
-              headerBackVisible: false,
-              headerLeft: () => <BackButton />,
-            }}
-          />
-          <Stack.Screen
-            name="alerts/[id]"
-            options={{
-              title: "Chi tiết cảnh báo",
-              headerBackVisible: false,
-              headerLeft: () => <BackButton />,
-            }}
-          />
-          <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-        </Stack>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <InAppNotificationProvider>
+            <AuthNavigationGuard />
+            {!isExpoGo && notificationMode !== "off" && (
+              <NotificationResponseHandler />
+            )}
+            {notificationMode === "local-polling" && <AlertPollingWatcher />}
+            {notificationMode === "push" && <PushNotificationSetup />}
+            <StatusBar style="dark" backgroundColor="#ffffff" />
+            <Stack>
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="account"
+                options={{
+                  title: "Thông tin tài khoản",
+                  headerBackVisible: false,
+                  headerLeft: () => <BackButton />,
+                }}
+              />
+              <Stack.Screen
+                name="account/edit"
+                options={{
+                  title: "Chỉnh sửa hồ sơ",
+                  headerBackVisible: false,
+                  headerLeft: () => <BackButton />,
+                }}
+              />
+              <Stack.Screen
+                name="account/change-password"
+                options={{
+                  title: "Đổi mật khẩu",
+                  headerBackVisible: false,
+                  headerLeft: () => <BackButton />,
+                }}
+              />
+              <Stack.Screen
+                name="alerts/[id]"
+                options={{
+                  title: "Chi tiết cảnh báo",
+                  headerBackVisible: false,
+                  headerLeft: () => <BackButton />,
+                }}
+              />
+              <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+            </Stack>
+            <InAppNotificationBanner />
+          </InAppNotificationProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 

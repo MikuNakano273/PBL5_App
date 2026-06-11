@@ -1,6 +1,7 @@
 import axios from "axios";
 
-import { clearTokens, getRefreshToken, saveTokens } from "@/src/auth/tokenStorage";
+import { clearAuthSession } from "@/src/auth/authSession";
+import { getRefreshToken, saveTokens } from "@/src/auth/tokenStorage";
 
 import { API_BASE_URL, http, normalizeApiError } from "./http";
 
@@ -82,7 +83,14 @@ export async function loginMobile({
     refresh_token: tokens.refresh_token,
   });
 
-  const user = await getMobileMe();
+  let user: MobileUser;
+
+  try {
+    user = await getMobileMe();
+  } catch (error) {
+    await clearAuthSession();
+    throw error;
+  }
 
   return {
     user,
@@ -146,7 +154,7 @@ export async function logoutMobile(): Promise<void> {
   } catch (error) {
     throw normalizeApiError(error);
   } finally {
-    await clearTokens();
+    await clearAuthSession();
   }
 }
 

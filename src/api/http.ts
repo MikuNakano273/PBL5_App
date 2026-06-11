@@ -5,17 +5,28 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
+import { Platform } from "react-native";
 
-import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "@/src/auth/tokenStorage";
+import { expireAuthSession } from "@/src/auth/authSession";
+import { getAccessToken, getRefreshToken, saveTokens } from "@/src/auth/tokenStorage";
+
+if (Platform.OS !== "web") {
+  axios.defaults.adapter = "fetch";
+}
 
 export const DEFAULT_DEV_API_BASE_URL = "http://localhost:8000";
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || DEFAULT_DEV_API_BASE_URL;
+  configuredApiBaseUrl?.trim() || DEFAULT_DEV_API_BASE_URL;
 
-if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
+if (!configuredApiBaseUrl) {
   console.warn(
     `Missing EXPO_PUBLIC_API_BASE_URL. Falling back to ${DEFAULT_DEV_API_BASE_URL}.`,
   );
+}
+
+if (__DEV__) {
+  console.info(`[api] Using base URL: ${API_BASE_URL}`);
 }
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
@@ -41,6 +52,18 @@ export type NormalizedApiError = Error & {
   code: string;
   details?: unknown;
   status?: number;
+};
+
+export type ApiConnectionResult = {
+  baseUrl: string;
+  platform: string;
+  status: number;
+};
+
+export type NetworkDiagnosticResult = {
+  api: string;
+  cloudflare: string;
+  google: string;
 };
 
 export const http = axios.create({
@@ -123,12 +146,81 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     });
   }
 
+  if (!status) {
+    const details = {
+      axiosCode: error.code,
+      adapter: Platform.OS === "web" ? "default" : "fetch",
+      baseUrl: error.config?.baseURL ?? API_BASE_URL,
+      method: error.config?.method,
+      platform: Platform.OS,
+      url: error.config?.url,
+    };
+
+    if (__DEV__) {
+      console.warn("[api] Network request failed.", details, error.message);
+    }
+
+    return createApiError({
+      code: "network_error",
+      message: `Không thể kết nối tới API ${API_BASE_URL}.`,
+      details,
+    });
+  }
+
   return createApiError({
-    code: status ? `http_${status}` : "network_error",
+    code: `http_${status}`,
     message: error.message || "API request failed.",
     details: data,
     status,
   });
+}
+
+export async function checkApiConnection(): Promise<ApiConnectionResult> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/health`, {
+      timeout: 10000,
+    });
+
+    return {
+      baseUrl: API_BASE_URL,
+      platform: Platform.OS,
+      status: response.status,
+    };
+  } catch (error) {
+    throw normalizeApiError(error);
+  }
+}
+
+export async function diagnoseNetworkConnection(): Promise<NetworkDiagnosticResult> {
+  const [api, cloudflare, google] = await Promise.all([
+    probeUrl(`${API_BASE_URL}/api/health`),
+    probeUrl("https://1.1.1.1/cdn-cgi/trace"),
+    probeUrl("https://www.google.com/generate_204"),
+  ]);
+
+  return {
+    api,
+    cloudflare,
+    google,
+  };
+}
+
+async function probeUrl(url: string) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+    });
+
+    return `HTTP ${response.status}`;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Network request failed";
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 const withBearerToken = (config: InternalAxiosRequestConfig, accessToken: string) => {
@@ -171,9 +263,14 @@ const refreshTokens = async () => {
       });
 
       return response.data;
-    })().finally(() => {
-      refreshPromise = null;
-    });
+    })()
+      .catch(async (error) => {
+        await expireAuthSession();
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
 
   return refreshPromise;
@@ -208,7 +305,6 @@ http.interceptors.response.use(
 
       return http(retryConfig);
     } catch (refreshError) {
-      await clearTokens();
       return Promise.reject(normalizeApiError(refreshError));
     }
   },

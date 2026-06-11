@@ -3,16 +3,19 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import {
-  getMobileUserAlerts,
+  getMobileUserAlertsPage,
   type MobileAlert,
 } from "@/src/api/alertService";
 import { mobileNotificationsQueryKey } from "@/src/api/notificationService";
 import { useAuth } from "@/src/auth/AuthContext";
 import { getStoredItem, setStoredItem } from "@/src/auth/persistentStorage";
+import { useInAppNotification } from "@/src/notifications/InAppNotificationContext";
 import { showAlertLocalNotification } from "@/src/notifications/localNotificationService";
+import { notificationMode } from "@/src/notifications/notificationMode";
 
 const ALERT_POLL_INTERVAL_MS = 12_000;
-const ALERT_POLL_PAGE_SIZE = 5;
+const ALERT_POLL_PAGE_SIZE = 20;
+const ALERT_POLL_MAX_PAGES = 50;
 const LAST_SEEN_ALERT_KEY_PREFIX = "alert_polling_last_seen";
 
 type LastSeenAlert = {
@@ -22,6 +25,7 @@ type LastSeenAlert = {
 
 export function useAlertPollingWatcher() {
   const { userId } = useAuth();
+  const { enqueueAlert } = useInAppNotification();
   const queryClient = useQueryClient();
   const lastSeenAlertRef = useRef<LastSeenAlert | null>(null);
 
@@ -33,6 +37,7 @@ export function useAlertPollingWatcher() {
 
     let isActive = true;
     let isPolling = false;
+    let didWarnMissingPagination = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     const storageKey = `${LAST_SEEN_ALERT_KEY_PREFIX}:${userId}`;
 
@@ -75,10 +80,18 @@ export function useAlertPollingWatcher() {
       isPolling = true;
 
       try {
-        const alerts = await getMobileUserAlerts({
-          page: 1,
-          limit: ALERT_POLL_PAGE_SIZE,
-        });
+        const alerts = await fetchAlertsUntilKnown(
+          lastSeenAlertRef.current,
+          () => isActive,
+          () => {
+            if (!didWarnMissingPagination && __DEV__) {
+              didWarnMissingPagination = true;
+              console.warn(
+                "[alert-polling] Alerts response has no pagination metadata; only the first page can be checked safely.",
+              );
+            }
+          },
+        );
         const latestAlert = alerts[0];
 
         if (!latestAlert || !isActive) {
@@ -101,7 +114,11 @@ export function useAlertPollingWatcher() {
         await saveLastSeenAlert(latestAlert);
 
         for (const alert of [...newAlerts].reverse()) {
-          await showAlertLocalNotification(alert);
+          enqueueAlert(alert);
+
+          if (notificationMode === "local-polling") {
+            await showAlertLocalNotification(alert);
+          }
         }
 
         await invalidateAlertQueries();
@@ -161,14 +178,73 @@ export function useAlertPollingWatcher() {
       stopPolling();
       appStateSubscription.remove();
     };
-  }, [queryClient, userId]);
+  }, [enqueueAlert, queryClient, userId]);
+}
+
+async function fetchAlertsUntilKnown(
+  lastSeenAlert: LastSeenAlert | null,
+  isActive: () => boolean,
+  warnMissingPagination: () => void,
+) {
+  const alertsById = new Map<string, MobileAlert>();
+  const fetchedPages = new Set<number>();
+  let page = 1;
+
+  while (isActive() && page <= ALERT_POLL_MAX_PAGES) {
+    if (fetchedPages.has(page)) {
+      if (__DEV__) {
+        console.warn(
+          `[alert-polling] Stopped because pagination repeated page ${page}.`,
+        );
+      }
+      break;
+    }
+
+    fetchedPages.add(page);
+    const result = await getMobileUserAlertsPage({
+      page,
+      limit: ALERT_POLL_PAGE_SIZE,
+    });
+
+    for (const alert of result.alerts) {
+      if (!alertsById.has(alert.id)) {
+        alertsById.set(alert.id, alert);
+      }
+    }
+
+    if (!result.pagination) {
+      warnMissingPagination();
+      break;
+    }
+
+    if (
+      !lastSeenAlert ||
+      result.alerts.some((alert) => alert.id === lastSeenAlert.id)
+    ) {
+      break;
+    }
+
+    if (!result.pagination.hasNextPage || !result.pagination.nextPage) {
+      break;
+    }
+
+    page = result.pagination.nextPage;
+  }
+
+  if (page > ALERT_POLL_MAX_PAGES && __DEV__) {
+    console.warn(
+      `[alert-polling] Stopped after ${ALERT_POLL_MAX_PAGES} pages to avoid an unbounded pagination loop.`,
+    );
+  }
+
+  return [...alertsById.values()];
 }
 
 function findNewAlerts(alerts: MobileAlert[], lastSeenAlert: LastSeenAlert) {
   const lastSeenIndex = alerts.findIndex((alert) => alert.id === lastSeenAlert.id);
 
   if (lastSeenIndex >= 0) {
-    return alerts.slice(0, lastSeenIndex);
+    return dedupeAlertsById(alerts.slice(0, lastSeenIndex));
   }
 
   const lastSeenTimestamp = Date.parse(lastSeenAlert.triggeredAt);
@@ -177,9 +253,22 @@ function findNewAlerts(alerts: MobileAlert[], lastSeenAlert: LastSeenAlert) {
     return [];
   }
 
-  return alerts.filter(
-    (alert) => Date.parse(alert.triggered_at) > lastSeenTimestamp,
+  return dedupeAlertsById(
+    alerts.filter((alert) => Date.parse(alert.triggered_at) > lastSeenTimestamp),
   );
+}
+
+function dedupeAlertsById(alerts: MobileAlert[]) {
+  const seenIds = new Set<string>();
+
+  return alerts.filter((alert) => {
+    if (seenIds.has(alert.id)) {
+      return false;
+    }
+
+    seenIds.add(alert.id);
+    return true;
+  });
 }
 
 function parseLastSeenAlert(value: string | null): LastSeenAlert | null {

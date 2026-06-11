@@ -8,7 +8,7 @@ import {
 } from "@/src/api/authService";
 import { type NormalizedApiError } from "@/src/api/http";
 import { useAuth } from "@/src/auth/AuthContext";
-import { clearTokens } from "@/src/auth/tokenStorage";
+import { clearAuthSession } from "@/src/auth/authSession";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -58,7 +58,7 @@ export default function ChangePasswordScreen() {
       setIsSubmitting(true);
       setErrors({});
       await changeMobilePassword(payload);
-      await clearTokens();
+      await clearAuthSession();
       setUser(null);
       queryClient.clear();
       router.replace("/login");

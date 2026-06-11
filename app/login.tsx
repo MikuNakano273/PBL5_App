@@ -2,7 +2,12 @@ import Card from "@/components/Card";
 import Screen from "@/components/Screen";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/src/auth/AuthContext";
-import { type NormalizedApiError } from "@/src/api/http";
+import {
+  API_BASE_URL,
+  checkApiConnection,
+  diagnoseNetworkConnection,
+  type NormalizedApiError,
+} from "@/src/api/http";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -20,6 +25,9 @@ import {
 
 const DEMO_EMAIL = "user@example.com";
 const DEMO_PASSWORD = "password123";
+const ENABLE_DEMO_LOGIN =
+  __DEV__ ||
+  process.env.EXPO_PUBLIC_ENABLE_DEMO_LOGIN?.trim().toLowerCase() === "true";
 
 const getLoginErrorMessage = (error: unknown) => {
   const apiError = error as Partial<NormalizedApiError>;
@@ -35,12 +43,39 @@ const getLoginErrorMessage = (error: unknown) => {
   return apiError.message || "Không thể đăng nhập. Vui lòng thử lại.";
 };
 
+const diagnoseLoginError = async (error: unknown) => {
+  const apiError = error as Partial<NormalizedApiError>;
+  const message = getLoginErrorMessage(error);
+
+  if (apiError.code !== "network_error") {
+    return message;
+  }
+
+  try {
+    const result = await checkApiConnection();
+
+    return [
+      message,
+      `API health vẫn phản hồi HTTP ${result.status} trên ${result.platform}.`,
+      "Hãy thử đăng nhập lại hoặc kiểm tra tài khoản.",
+    ].join("\n");
+  } catch {
+    const platformHint =
+      Platform.OS === "web"
+        ? "Bản web có thể bị server chặn CORS."
+        : "Hãy kiểm tra mạng, VPN, DNS hoặc Private Relay trên thiết bị.";
+
+    return `${message}\n${platformHint}`;
+  }
+};
+
 export default function LoginScreen() {
   const { isAuthenticated, isLoadingAuth, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingApi, setCheckingApi] = useState(false);
 
   useEffect(() => {
     if (!isLoadingAuth && isAuthenticated) {
@@ -67,9 +102,35 @@ export default function LoginScreen() {
       });
       router.replace("/(tabs)/dashboard" as Href);
     } catch (error) {
-      Alert.alert("Đăng nhập thất bại", getLoginErrorMessage(error));
+      Alert.alert("Đăng nhập thất bại", await diagnoseLoginError(error));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCheckApi = async () => {
+    try {
+      setCheckingApi(true);
+      const result = await checkApiConnection();
+      Alert.alert(
+        "Kết nối API thành công",
+        `${result.baseUrl}\nPlatform: ${result.platform}\nHTTP ${result.status}`,
+      );
+    } catch (error) {
+      const apiError = error as Partial<NormalizedApiError>;
+      const diagnostic = await diagnoseNetworkConnection();
+      Alert.alert(
+        "Không kết nối được API",
+        [
+          apiError.message || "Network Error",
+          API_BASE_URL,
+          `API: ${diagnostic.api}`,
+          `Cloudflare: ${diagnostic.cloudflare}`,
+          `Google: ${diagnostic.google}`,
+        ].join("\n"),
+      );
+    } finally {
+      setCheckingApi(false);
     }
   };
 
@@ -100,17 +161,39 @@ export default function LoginScreen() {
           </View>
 
           <Card style={styles.formCard}>
-            <View style={styles.demoBanner}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.demoTitle}>Dữ liệu test nhanh</Text>
-                <Text style={styles.demoText}>
-                  {DEMO_EMAIL} / {DEMO_PASSWORD}
-                </Text>
-              </View>
-              <Pressable style={styles.demoButton} onPress={handleFillDemo}>
-                <Text style={styles.demoButtonText}>Điền mẫu</Text>
-              </Pressable>
-            </View>
+            {ENABLE_DEMO_LOGIN && (
+              <>
+                <View style={styles.demoBanner}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.demoTitle}>Dữ liệu test nhanh</Text>
+                    <Text style={styles.demoText}>
+                      {DEMO_EMAIL} / {DEMO_PASSWORD}
+                    </Text>
+                  </View>
+                  <Pressable style={styles.demoButton} onPress={handleFillDemo}>
+                    <Text style={styles.demoButtonText}>Điền mẫu</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.apiDiagnostic}>
+                  <Text numberOfLines={1} style={styles.apiDiagnosticUrl}>
+                    API: {API_BASE_URL}
+                  </Text>
+                  <Pressable
+                    disabled={checkingApi}
+                    onPress={handleCheckApi}
+                    style={({ pressed }) => [
+                      styles.apiDiagnosticButton,
+                      (pressed || checkingApi) && styles.apiDiagnosticButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.apiDiagnosticButtonText}>
+                      {checkingApi ? "Đang kiểm tra..." : "Kiểm tra API"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
 
             <FieldLabel icon="email-outline" label="Email" />
             <TextInput
@@ -259,6 +342,33 @@ const styles = StyleSheet.create({
   demoButtonText: {
     color: "#FFFFFF",
     fontSize: 12,
+    fontWeight: "800",
+  },
+  apiDiagnostic: {
+    gap: 8,
+    padding: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: "#F7FAFF",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  apiDiagnosticUrl: {
+    color: theme.colors.subText,
+    fontSize: 11,
+  },
+  apiDiagnosticButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.text,
+  },
+  apiDiagnosticButtonPressed: {
+    opacity: 0.7,
+  },
+  apiDiagnosticButtonText: {
+    color: theme.colors.background,
+    fontSize: 11,
     fontWeight: "800",
   },
   labelRow: {

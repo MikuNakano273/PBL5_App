@@ -16,7 +16,13 @@ import {
   type MobileLoginInput,
   type MobileUser,
 } from "@/src/api/authService";
-import { clearTokens, getAccessToken } from "@/src/auth/tokenStorage";
+import {
+  clearAuthSession,
+  subscribeToAuthExpired,
+} from "@/src/auth/authSession";
+import { getAccessToken } from "@/src/auth/tokenStorage";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 
 type AuthContextValue = {
   user: MobileUser | null;
@@ -33,6 +39,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<MobileUser | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
 
@@ -43,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return currentUser;
     } catch (error) {
-      await clearTokens();
+      await clearAuthSession();
       setUser(null);
       throw error;
     }
@@ -66,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(currentUser);
         }
       } catch {
-        await clearTokens();
+        await clearAuthSession();
 
         if (isMounted) {
           setUser(null);
@@ -84,6 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  useEffect(
+    () =>
+      subscribeToAuthExpired(() => {
+        setUser(null);
+        queryClient.clear();
+        router.replace("/login");
+      }),
+    [queryClient],
+  );
 
   const login = useCallback(async (input: MobileLoginInput) => {
     const result = await loginMobile(input);

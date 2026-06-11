@@ -16,8 +16,9 @@ import { useAuth } from "@/src/auth/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import React, { useMemo } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import { StyleSheet, Text, View } from "react-native";
+
+import LocationMap from "../../components/LocationMap";
 
 type MapCoordinate = {
   latitude: number;
@@ -131,36 +132,12 @@ export default function MapScreen() {
           title="Chưa có dữ liệu vị trí"
           desc="Thiết bị chưa gửi tọa độ hợp lệ về server."
         />
-      ) : Platform.OS === "web" ? (
-        <View style={styles.mapFallback}>
-          <MaterialCommunityIcons
-            name="map-search-outline"
-            size={36}
-            color={theme.colors.subText}
-          />
-          <Text style={styles.mapFallbackTitle}>Map hiện hỗ trợ tốt trên app mobile</Text>
-          <Text style={styles.mapFallbackSub}>
-            Hãy mở trên Android hoặc iOS để xem bản đồ tương tác.
-          </Text>
-        </View>
       ) : (
         <View style={styles.mapCard}>
-          <MapView
-            style={StyleSheet.absoluteFill}
-            region={{
-              ...state.coordinate,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            showsCompass
-            showsScale
-          >
-            <Marker
-              coordinate={state.coordinate}
-              title="Người dùng"
-              description={`Cập nhật ${state.lastUpdate}`}
-            />
-          </MapView>
+          <LocationMap
+            coordinate={state.coordinate}
+            description={`Cập nhật ${state.lastUpdate}`}
+          />
 
           <View style={styles.mapLegend}>
             <View style={styles.legendRow}>
@@ -169,6 +146,7 @@ export default function MapScreen() {
               />
               <Text style={styles.legendText}>Vị trí hiện tại</Text>
             </View>
+            <Text style={styles.mapAttribution}>© OpenStreetMap contributors</Text>
           </View>
         </View>
       )}
@@ -415,30 +393,7 @@ const styles = StyleSheet.create({
   legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 99 },
   legendText: { color: theme.colors.text, fontSize: 12, fontWeight: "600" },
-
-  mapFallback: {
-    minHeight: 260,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(1),
-  },
-  mapFallbackTitle: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  mapFallbackSub: {
-    color: theme.colors.subText,
-    fontSize: 12,
-    textAlign: "center",
-  },
+  mapAttribution: { color: theme.colors.subText, fontSize: 10 },
 
   infoRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconWrap: {

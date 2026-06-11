@@ -1,433 +1,262 @@
-# Tổng kiểm tra cuối ứng dụng NavicAid
+# Review hiện trạng ứng dụng NavicAid
 
-Ngày kiểm tra: 10/06/2026
+Ngày cập nhật: 10/06/2026
 
-## 1. Phạm vi và kết luận nhanh
+## 1. Phạm vi
 
-Phạm vi kiểm tra:
+Tài liệu này chỉ ghi các thiếu sót còn tồn tại trong repo ứng dụng NavicAid tại thời điểm kiểm tra.
 
-- Ứng dụng Expo/React Native trong repo `NavicAid`.
-- Luồng đăng nhập, HTTP client, dashboard, bản đồ, cảnh báo, thông báo, tài khoản và Settings.
-- Luồng notification/push có đối chiếu trực tiếp với source backend trong repo `PBL5_Server`.
-- Chạy typecheck, lint, Android production bundle, kiểm tra secret và rà mã không còn sử dụng.
+Đã đối chiếu trực tiếp:
 
-Kết luận:
+- Mã nguồn Expo/React Native trong `app/`, `src/`, `components/` và `hooks/`.
+- Cấu hình hiện tại trong `.env`, `app.json` và `package.json`.
+- Kết quả `npm run typecheck` và `npm run lint`.
 
-- Ứng dụng đã đủ tốt để demo tích hợp và kiểm thử với người dùng nội bộ.
-- Các luồng chính đã có: đăng nhập, refresh token, dashboard, vị trí, danh sách/chi tiết cảnh báo, hộp thư thông báo, chỉnh sửa hồ sơ, đổi mật khẩu, logout và dev test alert.
-- Ứng dụng chưa production-ready vì notification/push chưa hoàn chỉnh end-to-end, installation API chưa an toàn, chưa có test suite, chưa có pagination và còn nhiều mã starter/placeholder.
-- Ước tính mức hoàn thiện:
-  - Demo chức năng: khoảng **85%**.
-  - Sẵn sàng production: khoảng **60%**.
+Không đánh giá trạng thái triển khai backend vì source backend không nằm trong workspace hiện tại.
 
-## 2. Kết quả kiểm tra kỹ thuật
+## 2. Kết luận hiện tại
 
-Đã chạy:
+App đã có các luồng chính để demo:
 
-- `npm run typecheck`: đạt.
-- `npm run lint`: đạt.
-- `npx expo export --platform android`: đạt, Android bundle tạo thành công.
-- `git diff --check`: đạt.
-- Kiểm tra file secret được Git theo dõi: `.env` không được track.
+- Đăng nhập, hydrate session, refresh token và đăng xuất.
+- Dashboard, bản đồ, danh sách và chi tiết cảnh báo.
+- Hộp thư thông báo, badge chưa đọc, đánh dấu đã đọc và pull-to-refresh.
+- Hồ sơ, chỉnh sửa hồ sơ, đổi mật khẩu và danh sách thiết bị.
+- Polling alert khi app đang mở, local notification và mở chi tiết alert khi bấm notification.
+- Đăng ký native push token khi chạy ở chế độ `push`.
 
-Chưa xác minh được:
+App chưa production-ready. Các thiếu sót quan trọng nhất hiện tại là cảnh báo chưa hoạt động đầy đủ khi app chạy nền, chưa có thanh cảnh báo trong app, installation API phía app chỉ gửi fingerprint, auth state có thể lệch sau lỗi refresh và chưa có test tự động.
 
-- `npm audit` và `expo-doctor` không chạy xong vì môi trường hiện tại không truy cập được `registry.npmjs.org`.
-- Repo chưa có script `test`, `test:coverage` hoặc E2E test.
+## 3. Thiếu sót còn tồn tại
 
-Lưu ý trạng thái worktree:
+### P0 - Cấu hình hiện tại chỉ nhận alert bằng polling foreground
 
-- Hiện có thay đổi chưa commit ở `README.md`, `app/(tabs)/settings.tsx` và `src/dev/`.
-
-## 3. Các vấn đề cần ưu tiên
-
-### P0 - Notification/push chưa hoạt động end-to-end
-
-Đây là vấn đề lớn nhất của hệ thống hiện tại.
-
-App có ba chế độ:
-
-- `local-polling`: poll alert từ server rồi tạo local notification.
-- `push`: đăng ký FCM/APNs token để chờ server gửi push.
-- `off`: tắt notification runtime.
-
-Cấu hình `.env` hiện tại đang dùng:
+`.env` hiện đặt:
 
 ```env
 EXPO_PUBLIC_NOTIFICATION_MODE=local-polling
 ```
 
-Do đó, trên thiết bị hiện tại:
+Trong chế độ này:
 
-- App poll `GET /api/mobile/v1/me/alerts?page=1&limit=5` mỗi 12 giây.
-- Polling chỉ chạy khi app ở foreground.
-- Khi phát hiện alert mới, app gọi `showAlertLocalNotification`.
-- Khi bấm notification local, app mở `/alerts/{alert_id}`.
-- App không đăng ký push token trong mode này.
-
-Trong mode production mặc định `push`:
-
-- App xin quyền notification.
-- App lấy native FCM/APNs token.
-- App gửi token tới `POST /api/mobile/v1/installations/me/push-token`.
-- Tuy nhiên backend `PushNotificationService.send()` hiện chỉ trả về object mô phỏng `sent: true`, chưa gọi FCM hoặc APNs thật.
-- `AlertService` chỉ tạo alert và cập nhật live status, không phát push event.
-- Backend còn chủ động từ chối lưu `alert_created` vào notification inbox.
-
-Kết luận:
-
-- Alert hiện được nhận đáng tin cậy nhất qua polling khi app đang mở.
-- Alert chưa thể đến thiết bị khi app background/offline bằng push thật.
-- Notification inbox hiện dành cho system/account/announcement event, không phải alert.
-
-### P0 - Installation API chỉ xác thực bằng fingerprint
-
-Các endpoint sau chỉ dùng `X-Device-Fingerprint`, không dùng mobile JWT:
-
-- Xem notification inbox.
-- Mark notification read.
-- Đăng ký/thay push token.
-- Xem danh sách account trên installation.
-- Switch account và nhận access/refresh token mới.
-
-Fingerprint được app tự sinh và lưu trên thiết bị, nhưng không phải credential bí mật đủ mạnh. Nếu fingerprint bị lộ, người khác có thể truy cập inbox, thay push token hoặc nghiêm trọng hơn là switch account.
-
-Khuyến nghị:
-
-- Bắt buộc mobile JWT cho inbox, mark-read và push-token.
-- Với switch-account, bắt buộc re-authentication, PIN hoặc installation secret có entropy cao, có rotate/revoke.
-- Không dùng fingerprint như bằng chứng xác thực duy nhất.
-
-### P0 - Chưa có test suite
-
-Repo chưa có unit test, integration test hoặc E2E test. Typecheck và lint không kiểm chứng được hành vi runtime.
-
-Những luồng cần test trước:
-
-- Login thành công/thất bại, hydrate session, refresh token đồng thời.
-- Refresh thất bại phải đưa người dùng về login.
-- Logout online/offline.
-- Polling phát hiện alert mới, không phát trùng và không bỏ sót.
-- Push/local notification mở đúng alert detail.
-- Notification mark-read và badge unread.
-- Edit profile và change password.
-
-### P1 - Auth lifecycle còn hai lỗ hổng logic
-
-1. `loginMobile()` lưu token trước khi gọi `/me`. Nếu `/me` thất bại, token có thể vẫn còn trong storage dù login UI báo lỗi.
-2. Khi Axios interceptor refresh thất bại, token bị xóa nhưng `AuthContext.user` chưa được xóa ngay. UI có thể tạm thời vẫn nghĩ người dùng đang đăng nhập.
-
-Khuyến nghị:
-
-- Clear token nếu `/me` thất bại sau login.
-- Tạo auth-expired callback/event dùng chung giữa HTTP client và `AuthContext`.
-- Gom logic refresh token đang bị lặp giữa `authService.ts` và `http.ts`.
-
-### P1 - Polling alert có thể bỏ sót dữ liệu
-
-Polling hiện chỉ lấy 5 alert mới nhất mỗi 12 giây.
+- App gọi `GET /api/mobile/v1/me/alerts?page=1&limit=5` mỗi 12 giây.
+- Polling dừng khi app không còn ở trạng thái active.
+- Alert mới tạo local notification của hệ điều hành.
+- App không đăng ký push token.
 
 Rủi ro:
 
-- Nếu có hơn 5 alert mới giữa hai lần poll, app có thể bỏ sót alert cũ hơn.
-- Polling chỉ hoạt động khi app foreground.
-- Polling 12 giây trên nhiều thiết bị tạo tải server và tiêu thụ pin/data.
-- Lần khởi động đầu chỉ lưu baseline, không thông báo alert đã có trước đó.
+- Không nhận được alert mới khi app background hoặc đã tắt.
+- Có thể bỏ sót nếu hơn 5 alert xuất hiện giữa hai lần poll.
+- Lần chạy đầu chỉ lưu alert mới nhất làm mốc và không thông báo các alert đã tồn tại.
 
-Polling phù hợp làm fallback/dev mode, không nên là cơ chế production chính.
+Thay đổi phù hợp:
 
-### P1 - Notification inbox không tự cập nhật khi push đến
+- Dùng push làm kênh chính ở production.
+- Giữ polling làm fallback với khoảng thời gian chậm hơn.
+- Khi polling, phân trang cho tới khi gặp alert đã biết thay vì chỉ lấy 5 bản ghi.
+- Xác minh push thật trên Android/iOS ở foreground, background và terminated.
 
-Notification inbox dùng React Query nhưng không có:
+### P0 - Chưa có thanh cảnh báo nằm trên cùng trong app
 
-- `refetchInterval`.
-- Listener nhận notification để invalidate query.
-- Pagination.
+App đã có banner notification của hệ điều hành qua `expo-notifications`, nhưng chưa có banner/toast toàn cục được render trong `app/_layout.tsx`.
 
-Badge tab và danh sách có thể cũ cho tới khi query được refetch hoặc người dùng pull-to-refresh.
+Hệ quả:
 
-### P1 - Contract notification giữa app, tài liệu và server đang lệch
+- Khi app đang mở, người dùng vẫn phụ thuộc vào cách hệ điều hành hiển thị notification.
+- Không có CTA “Xem chi tiết” hoặc nút đóng ngay trong giao diện NavicAid.
+- Không thể ưu tiên và giữ cảnh báo nguy hiểm trên màn hình lâu hơn thông báo thường.
 
-App và API document vẫn định nghĩa notification event có:
+Thay đổi phù hợp:
 
-- `alert_id`
-- `risk_level`
+- Tạo provider quản lý hàng đợi banner ở root layout.
+- Hiển thị một banner tại một thời điểm, chống trùng theo `alert_id` hoặc event ID.
+- Alert nguy hiểm giữ trên màn hình tới khi người dùng xử lý; thông báo thường tự ẩn sau 4-6 giây.
+- Bấm “Xem chi tiết” mở `/alerts/[id]`.
+- Không hiển thị banner khi chưa đăng nhập.
 
-Nhưng server hiện lọc bỏ mọi event có `alert_id`, `risk_level` hoặc `event_type=alert_created` khỏi inbox.
+Các file dự kiến:
 
-Server event thực tế thiên về:
+- Tạo `src/notifications/InAppNotificationContext.tsx`.
+- Tạo `components/InAppNotificationBanner.tsx`.
+- Sửa `app/_layout.tsx`.
+- Sửa `src/realtime/useAlertPollingWatcher.ts`.
 
-- `event_type`
-- `category`
-- `priority`
-- `title`
-- `message`
+### P0 - Push mode thiếu listener nhận notification foreground
 
-Cần thống nhất lại type và tài liệu để app không hiển thị logic alert cho một inbox chỉ chứa system notification.
+App đã đăng ký FCM/APNs token trong `usePushNotificationSetup`, nhưng không có `Notifications.addNotificationReceivedListener`.
 
-## 4. Đánh giá từng khu vực
+Hệ quả khi push đến lúc app đang mở:
 
-### Auth và HTTP client
+- Không có logic app-level để hiển thị in-app banner.
+- Dashboard, alerts và notification inbox không được invalidate ngay từ push.
+- Badge và dữ liệu có thể giữ trạng thái cũ cho tới lần refetch khác.
 
-Điểm tốt:
+Thay đổi phù hợp:
 
-- Token được lưu bằng SecureStore trên Android/iOS.
-- Bearer token tự động được gắn vào mobile API.
-- Có refresh token rotation và khóa `refreshPromise` để tránh refresh đồng thời.
-- Có normalize error chung.
-- Logout luôn clear token local.
+- Thêm foreground notification listener ở root.
+- Parse payload tại một module dùng chung.
+- Invalidate các query liên quan khi nhận push.
+- Theo dõi thay đổi push token và đăng ký lại token mới.
 
-Cần cải thiện:
+### P0 - Installation API phía app chỉ gửi fingerprint
 
-- Sửa auth lifecycle như mục P1.
-- Không hiển thị demo password trong production.
-- Web dùng localStorage cho token, cần cân nhắc nếu web trở thành target production.
-- Thêm runtime schema validation cho response quan trọng.
+`notificationService.ts` gọi các endpoint notification và push-token bằng `X-Device-Fingerprint`, không dùng HTTP client có Bearer token.
 
-### Dashboard
+Fingerprint được app tự sinh và lưu trên thiết bị, nhưng không nên được xem là credential xác thực duy nhất.
 
-Điểm tốt:
+Thay đổi phù hợp:
 
-- Hiển thị safety status, thiết bị, khoảng cách và alert gần đây.
-- Alert gần đây mở được màn hình chi tiết.
-- Có polling dashboard mỗi 30 giây.
+- Thống nhất contract với server để yêu cầu JWT hoặc installation secret an toàn.
+- Installation secret cần có khả năng rotate và revoke.
+- Scope cache notification theo user/installation sau khi contract được thống nhất.
 
-Cần cải thiện:
+### P0 - Auth state có thể lệch sau lỗi
 
-- Không có pull-to-refresh/retry trực tiếp.
-- Device query lỗi nhưng dashboard không báo rõ.
-- Chỉ lấy thiết bị đầu tiên làm thiết bị chính mà chưa có quy tắc nghiệp vụ.
-- Màn hình còn nhiều khoảng trống và chưa nhấn mạnh hành động khẩn cấp.
+Hai trường hợp còn tồn tại:
 
-### Alerts
+1. `loginMobile()` lưu token trước khi gọi `/me`; nếu `/me` thất bại, token vẫn có thể còn trong storage.
+2. Khi Axios interceptor refresh thất bại, token bị xóa nhưng `AuthContext.user` không được xóa ngay.
 
-Điểm tốt:
+Thay đổi phù hợp:
 
-- Có danh sách, lọc local và màn hình chi tiết.
-- Hiển thị risk, trạng thái, khoảng cách, tọa độ và thời gian.
+- Clear token nếu bước lấy `/me` sau login thất bại.
+- Tạo callback/event auth-expired dùng chung giữa HTTP client và `AuthContext`.
+- Gom logic refresh token đang lặp ở `authService.ts` và `http.ts`.
 
-Cần cải thiện:
+### P0 - Chưa có test tự động
 
-- Chỉ tải page đầu tiên, tối đa 20 alert.
-- Filter chỉ áp dụng trên 20 alert đã tải.
-- Chưa có pull-to-refresh hoặc load-more.
-- Filter đang dùng tiếng Anh trong UI tiếng Việt.
-- Nên thêm nút “Xem trên bản đồ” khi alert có tọa độ.
+Repo chưa có script unit test, integration test, coverage hoặc E2E test. File `src/dev/devAlertService.test-d.ts` chỉ kiểm tra type, không kiểm tra hành vi runtime.
 
-### Map
+Các luồng cần test trước:
 
-Điểm tốt:
+- Login, hydrate session, refresh token đồng thời và refresh thất bại.
+- Polling phát hiện alert mới, chống trùng và trường hợp nhiều hơn 5 alert.
+- Notification mở đúng alert detail.
+- Badge chưa đọc và đánh dấu notification đã đọc.
+- Edit profile, đổi mật khẩu và logout offline.
 
-- Đọc đúng tọa độ thường và GeoJSON.
-- Có fallback từ location sang dashboard.
-- Có kiểm tra tọa độ hợp lệ.
+### P0 - Demo credential luôn xuất hiện trên màn hình login
 
-Cần cải thiện:
+`app/login.tsx` luôn hiển thị:
 
-- Poll mỗi 10 giây, chưa tối ưu cho production.
-- Chưa có lịch sử di chuyển, accuracy, speed, heading hoặc alert marker.
-- Web bundle hiện bị chặn bởi `react-native-maps` native-only.
-- Controlled `region` có thể làm trải nghiệm pan/zoom bị reset khi query cập nhật.
+- `user@example.com`
+- `password123`
+- Nút điền dữ liệu mẫu.
 
-### Account
+Thay đổi phù hợp:
 
-Điểm tốt:
+- Chỉ render khối demo khi `__DEV__` hoặc một biến môi trường dev rõ ràng được bật.
+- Không đóng gói credential mẫu trong production build.
 
-- Đã có profile, danh sách device, edit profile và đổi mật khẩu.
-- Đổi mật khẩu xong buộc đăng nhập lại.
-- Các form có validation và error state tương đối tốt.
+### P1 - Danh sách cảnh báo chưa có pagination và refresh
 
-Cần cải thiện:
+Màn hình Alerts chỉ tải page đầu tiên với tối đa 20 alert. Bộ lọc chỉ áp dụng trên dữ liệu đã tải.
 
-- Cần test validation và auth expiry.
-- Cần hiển thị thêm serial/firmware nếu có giá trị sử dụng thực tế.
-- Các màn hình account khá dài, nên tách component dùng chung.
+Thiếu:
 
-### Settings
+- Load-more hoặc infinite query.
+- Pull-to-refresh.
+- Retry trực tiếp khi lỗi.
+- Các chip lọc vẫn dùng tiếng Anh: `All`, `Danger`, `Warn`, `Open`, `Resolved`.
 
-Điểm tốt:
+Thay đổi phù hợp:
 
-- Logout thật.
-- Có dev-only test alert.
-- Nút dev được ẩn mặc định trong production nếu không bật env.
+- Dùng `useInfiniteQuery` hoặc pagination rõ ràng.
+- Thêm pull-to-refresh và retry.
+- Đổi chip lọc sang tiếng Việt.
+- Nếu backend hỗ trợ, gửi filter lên server.
 
-Cần cải thiện:
+### P1 - Notification inbox chưa tự cập nhật theo vòng đời app
 
-- “Bật cảnh báo” và “Rung khi cảnh báo” vẫn là placeholder.
-- “Thông tin ứng dụng” chỉ là row tĩnh.
-- “Thông báo đẩy” trông như setting nhưng không thể thao tác và không phản ánh permission/mode thực tế.
-- Backend hiện chưa có route `/api/mobile/v1/dev/test-alert`, nên nút dev sẽ fallback sang alert mock local.
+Màn hình notification đã có pull-to-refresh và badge chưa đọc. Tuy nhiên:
 
-Đề xuất:
+- Không có foreground push listener để invalidate query.
+- Không refetch rõ ràng khi app trở lại active.
+- Không có pagination.
+- Query key `["mobile-notifications"]` chưa scope theo user hoặc installation.
 
-- Nếu chưa có settings API, xóa hai placeholder khỏi bản release.
-- Hiển thị trạng thái notification thực: mode, permission, push token đã đăng ký/chưa đăng ký.
-- Tạo trang “Thông tin ứng dụng” có version, build number, API environment và chính sách quyền riêng tư.
+Thay đổi phù hợp:
 
-## 5. Phương án notification tốt nhất
+- Invalidate khi nhận push và refetch khi app active.
+- Thêm pagination.
+- Scope query key theo user/installation.
 
-### Kiến trúc đề xuất
+### P1 - Dashboard chưa có refresh/retry và bỏ qua lỗi device query
 
-Giữ alert và notification inbox là hai domain riêng:
+Dashboard đã polling mỗi 30 giây và hiển thị thời gian cập nhật. Tuy nhiên:
 
-- **Alert**: sự kiện an toàn từ gậy, đọc qua Alert API.
-- **Notification inbox**: thông báo hệ thống, tài khoản, bảo trì, announcement.
+- Không có pull-to-refresh hoặc nút retry.
+- Lỗi `getMobileUserDevices()` không được hiển thị.
+- App mặc định dùng `devices[0]` làm thiết bị chính nhưng chưa thể hiện quy tắc nghiệp vụ.
 
-Khi server tạo alert:
+Thay đổi phù hợp:
 
-1. Lưu alert vào database.
-2. Commit transaction hoặc hoàn tất persistence.
-3. Đẩy một job `send_alert_push` vào queue.
-4. Worker gửi FCM/APNs thật tới các installation của user.
-5. Push payload chỉ mang dữ liệu điều hướng tối thiểu:
+- Thêm pull-to-refresh/retry.
+- Hiển thị trạng thái lỗi thiết bị độc lập với lỗi dashboard.
+- Xác định thiết bị chính từ server hoặc cho người dùng chọn.
 
-```json
-{
-  "type": "alert.created",
-  "alert_id": "alert-id",
-  "risk_level": "high"
-}
-```
+### P1 - Bản đồ còn giới hạn về trải nghiệm dữ liệu
 
-6. Khi app nhận push:
-   - Hiển thị notification hệ điều hành.
-   - Invalidate `mobile-dashboard`, `mobile-alerts` và alert detail liên quan.
-   - Khi người dùng bấm, mở màn hình chi tiết alert.
-7. Giữ polling với khoảng thời gian chậm hơn như 60-120 giây hoặc chỉ chạy khi push không khả dụng, dùng làm cơ chế phục hồi.
+Map đã có fallback khi location API lỗi, hiển thị thời gian cập nhật và fallback UI trên web. Các thiếu sót còn lại:
 
-### Việc cần bổ sung ở app
+- Controlled `region` có thể kéo bản đồ về vị trí server sau mỗi lần refetch.
+- Chỉ hiển thị vị trí mới nhất dù API type có `accuracy`, `speed` và `heading`.
+- Chưa có lịch sử di chuyển hoặc marker alert.
+- Chưa cảnh báo rõ khi tọa độ đã quá cũ.
 
-- Thêm listener nhận notification foreground để invalidate query ngay.
-- Thêm listener theo dõi push token thay đổi và đăng ký lại.
-- Thêm unregister/revoke push token khi logout hoặc installation bị thu hồi.
-- Hiển thị trạng thái permission và hướng dẫn mở Settings hệ điều hành khi permission bị từ chối.
-- Scope query key theo user/installation khi triển khai multi-account.
-- Không yêu cầu quyền notification lặp lại trong nhiều service.
+Thay đổi phù hợp:
 
-### Việc cần bổ sung ở server
+- Dùng `initialRegion` hoặc chỉ animate camera khi người dùng yêu cầu.
+- Hiển thị độ chính xác và trạng thái dữ liệu cũ.
+- Bổ sung lịch sử/marker alert nếu thuộc phạm vi sản phẩm.
 
-- Thay `PushNotificationService` stub bằng FCM Admin SDK/APNs provider thật.
-- Gửi push alert từ queue, không gửi đồng bộ trong request tạo alert.
-- Retry có exponential backoff và dead-letter handling.
-- Xóa/revoke token invalid do FCM/APNs trả về.
-- Có idempotency/dedup để không gửi push trùng.
-- Có metrics: số push gửi, thành công, thất bại, latency.
-- Bảo vệ push-token endpoint bằng JWT/installation credential an toàn.
+### P1 - Settings còn nội dung chưa hoạt động
 
-Đây là phương án tốt hơn polling vì nhận được alert khi app background/offline, giảm tải API và giảm tiêu thụ pin.
+Settings đã đánh dấu “Bật cảnh báo” và “Rung khi cảnh báo” là “Sắp hỗ trợ”, nhưng vẫn còn:
 
-## 6. Gợi ý thay đổi giao diện
+- “Thông báo đẩy” chỉ là thông tin tĩnh, không phản ánh permission hoặc mode hiện tại.
+- “Thông tin ứng dụng” là row tĩnh, không thể mở.
 
-### Ưu tiên trải nghiệm an toàn
+Thay đổi phù hợp:
 
-- Dashboard nên có một khối trạng thái lớn, dễ đọc: “An toàn / Cần chú ý / Nguy hiểm”.
-- Khi nguy hiểm, dùng màu và CTA rõ: “Xem cảnh báo mới nhất”, “Xem vị trí”.
-- Hiển thị “Lần cuối thiết bị kết nối” nổi bật để tránh hiểu nhầm dữ liệu cũ là dữ liệu hiện tại.
+- Hiển thị notification mode, permission và trạng thái đăng ký push token thực tế.
+- Cho phép mở Settings hệ điều hành khi permission bị từ chối.
+- Tạo trang thông tin ứng dụng hoặc bỏ row khỏi release.
 
-### Chuẩn hóa ngôn ngữ
+### P2 - Còn starter code, tài liệu và dependency dư
 
-Đổi toàn bộ tab và filter sang tiếng Việt:
+Các phần chưa được luồng app chính sử dụng:
 
-- Dashboard → Tổng quan.
-- Map → Bản đồ.
-- Alerts → Cảnh báo.
-- Settings → Cài đặt.
-- All/Danger/Warn/Open/Resolved → Tất cả/Nguy hiểm/Cảnh báo/Đang mở/Đã xử lý.
+- `app/modal.tsx` và route modal.
+- Nhóm component/hook starter Expo trong `components/themed-*`, `components/ui/`, `hooks/use-*`.
+- `src/mock/`.
+- `src/api/health.ts`.
+- `API document copy.md` trùng gần như toàn bộ với `API document.md`.
+- `react-native-paper` và `react-native-vector-icons` không có import trực tiếp trong source hiện tại.
 
-### Giảm số tab
+Ngoài ra, `README.md` vẫn chủ yếu là nội dung starter Expo.
 
-Năm tab hiện hơi dày. Có thể giữ bốn tab:
+Chỉ xóa sau khi chạy lại typecheck, lint và build Android/iOS.
 
-- Tổng quan.
-- Bản đồ.
-- Cảnh báo.
-- Tài khoản.
+## 4. Thứ tự triển khai đề xuất
 
-Đưa notification inbox và Settings vào màn hình Tài khoản hoặc icon trên header. Nếu notification là chức năng quan trọng, giữ tab notification nhưng đưa Settings vào Account.
+1. Sửa auth lifecycle và ẩn demo credential khỏi production.
+2. Thêm in-app banner, foreground notification listener và invalidate query.
+3. Xác minh push production, giữ polling làm fallback an toàn.
+4. Cứng hóa installation authentication.
+5. Thêm test cho auth, alert và notification.
+6. Thêm pagination/refresh cho alerts và notification inbox.
+7. Hoàn thiện Dashboard, Map, Settings và dọn starter code.
 
-### Tăng tính nhất quán
+## 5. Tiêu chí production-ready
 
-- Tạo component dùng chung cho loading/error/retry.
-- Tạo component dùng chung cho alert card và risk badge.
-- Dùng skeleton loading thay vì chỉ EmptyState.
-- Thêm pull-to-refresh cho dashboard và alerts.
-- Chuẩn hóa spacing, title và action giữa các màn hình.
-- Kiểm tra font scale lớn và accessibility cho người dùng thị lực yếu.
-
-## 7. Những phần nên xóa hoặc thu gọn
-
-Các file starter Expo hiện không được luồng app thật sử dụng và nên xóa sau khi xác nhận:
-
-- `app/modal.tsx` và route modal trong `app/_layout.tsx`.
-- `components/external-link.tsx`
-- `components/haptic-tab.tsx`
-- `components/hello-wave.tsx`
-- `components/parallax-scroll-view.tsx`
-- `components/themed-text.tsx`
-- `components/themed-view.tsx`
-- `components/ui/collapsible.tsx`
-- `components/ui/icon-symbol.tsx`
-- `components/ui/icon-symbol.ios.tsx`
-- `hooks/use-color-scheme.ts`
-- `hooks/use-color-scheme.web.ts`
-- `hooks/use-theme-color.ts`
-- `src/mock/db.ts`
-- `src/mock/mockApi.ts`
-- `src/api/health.ts` nếu không dùng cho diagnostics.
-
-Dependency có dấu hiệu không còn cần trực tiếp:
-
-- `expo-haptics`
-- `expo-symbols`
-- `expo-web-browser`
-- `react-native-paper`
-- `react-native-vector-icons`
-
-Chỉ xóa dependency sau khi chạy lại typecheck, lint và Android/iOS build.
-
-Ngoài ra:
-
-- Hai file `API document.md` và `API document copy.md` bị trùng nội dung. Nên giữ một nguồn chuẩn.
-- Các màn hình lớn từ 300-600 dòng nên tách component/helper để dễ test và bảo trì.
-- `Dashboard StatCard` đang dùng `icon: any`; nên dùng type icon cụ thể.
-
-## 8. Lộ trình đề xuất
-
-### P0 - Trước khi triển khai production
-
-1. Hoàn thiện push alert end-to-end bằng FCM/APNs thật.
-2. Sửa bảo mật installation API và switch-account.
-3. Sửa auth lifecycle khi login/refresh thất bại.
-4. Thêm test runner và test các luồng auth/alert/notification.
-5. Xóa demo credential khỏi production UI.
-6. Đồng bộ notification contract giữa app, tài liệu và server.
-
-### P1 - Hoàn thiện trải nghiệm
-
-1. Thêm notification received listener để invalidate query.
-2. Thêm pagination cho alerts và notifications.
-3. Thêm pull-to-refresh/retry thống nhất.
-4. Chuẩn hóa toàn bộ tiếng Việt và navigation.
-5. Hiển thị notification permission/push status trong Settings.
-6. Xóa starter code, mock code và dependency dư.
-
-### P2 - Phát triển tiếp
-
-1. Lịch sử vị trí và marker alert trên bản đồ.
-2. Safe zone và emergency contact nếu đúng yêu cầu sản phẩm.
-3. Multi-account flow sau khi có mô hình bảo mật an toàn.
-4. Monitoring/crash reporting và analytics kỹ thuật.
-5. CI chạy typecheck, lint, test, Android/iOS build và dependency audit.
-
-## 9. Tiêu chí hoàn thành production
-
-Chỉ nên coi app production-ready khi:
-
-- Alert đến được thiết bị qua push thật khi app foreground, background và terminated.
-- Push bị lỗi có retry, token invalid được thu hồi và polling fallback hoạt động.
-- Installation API không còn dựa duy nhất vào fingerprint.
-- Auth expiry luôn đưa UI về login đúng lúc.
-- Không còn demo password, mock/starter code và placeholder gây hiểu nhầm.
-- Alerts/notifications có pagination.
-- Có unit, integration và E2E test cho luồng chính.
-- Android/iOS build, security audit và smoke test với server thật đều đạt.
+- Alert đến được khi app foreground, background và terminated.
+- App foreground hiển thị thanh cảnh báo toàn cục và mở đúng chi tiết.
+- Không bỏ sót hoặc hiển thị trùng alert.
+- Auth expiry luôn xóa session UI và đưa người dùng về login.
+- Installation API không dựa duy nhất vào fingerprint.
+- Không còn demo credential trong production.
+- Alerts và notifications có pagination.
+- Có unit, integration và E2E test cho các luồng chính.
+- Typecheck, lint, Android/iOS build và smoke test với server thật đều đạt.

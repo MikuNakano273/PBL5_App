@@ -1,9 +1,15 @@
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
 export type NotificationMode = "local-polling" | "push" | "off";
 
 const configuredMode = process.env.EXPO_PUBLIC_NOTIFICATION_MODE?.trim();
+export const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export const notificationMode: NotificationMode = isNotificationMode(configuredMode)
-  ? configuredMode
+  ? configuredMode === "push" && isExpoGo
+    ? "off"
+    : configuredMode
   : __DEV__
     ? "local-polling"
     : "push";
