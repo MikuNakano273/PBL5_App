@@ -7,6 +7,7 @@ export type MobileAlert = {
   alert_type: string;
   title: string;
   message: string;
+  summary_text?: string | null;
   risk_level: string;
   status: string;
   lat: number | null;

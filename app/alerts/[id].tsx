@@ -104,6 +104,13 @@ export default function AlertDetailScreen() {
       >
         <AlertHeader alert={alert} />
 
+        {alert.summary_text?.trim() ? (
+          <Card>
+            <Text style={styles.analysisTitle}>Phân tích vật cản</Text>
+            <Text style={styles.analysisText}>{alert.summary_text.trim()}</Text>
+          </Card>
+        ) : null}
+
         <Card>
           <DetailRow label="Loại cảnh báo" value={formatLabel(alert.alert_type)} />
           <Divider />
@@ -275,6 +282,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 6,
+  },
+  analysisTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  analysisText: {
+    color: theme.colors.subText,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: theme.spacing(0.75),
   },
   detailRow: {
     gap: 4,

@@ -135,7 +135,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen style={styles.screen}>
+    <Screen edges={["top", "right", "bottom", "left"]} style={styles.screen}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
